@@ -9,3 +9,4 @@
 * oauth = токен вместе со словом oauth.
 * my_nick = ваше имя пользователя 
 * channel = название вашего канала
+![](http://s1.uploadpics.ru/images/Wylq3uVVHS.png)
