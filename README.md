@@ -5,7 +5,7 @@
 * gtk
 * libnotify
 
-	Получите токен с сайта https://twitchapps.com/tmi/ .Нужно заполнить файл oauth.h.
+Получите токен с сайта https://twitchapps.com/tmi/ .Нужно заполнить файл oauth.h.
 * oauth = токен вместе со словом oauth.
 * my_nick = ваше имя пользователя 
 * channel = название вашего канала
