@@ -1,3 +1,6 @@
+/*
+ * Copyright Dmitrii Naidolinskii
+ */
 #include <stdio.h>
 #include <netdb.h>
 #include <sys/types.h>
