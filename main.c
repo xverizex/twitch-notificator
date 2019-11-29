@@ -13,6 +13,8 @@
 #include <glib-2.0/gio/gio.h>
 #include "parser.h"
 
+GNotification *notify;
+
 int sockfd;
 int size = 16384;
 char *rbuffer;
@@ -21,9 +23,18 @@ const char *rping = "PING :tmi.twitch.tv";
 const char *default_line = ":tmi.twitch.tv";
 const char *join = "JOIN";
 const char *msg = "PRIVMSG";
+char *line_for_message;
 char *message;
 char *nick;
 char *room;
+
+const char *commands =
+"next - audacious перключение песни вперед. "
+"prev - audacious переключение песни назад. "
+"help - эта справка"
+;
+
+const char *opt_help;
 
 char *opt_oauth;
 char *opt_channel;
@@ -81,16 +92,22 @@ void audacious_manage_prev ( ) {
 			);
 }
 
+
+void print_help ( ) {
+	gchar *body = g_strdup_printf ( "%s%s\r\n", line_for_message, commands );
+	write ( sockfd, body, strlen ( body ) );
+	g_free ( body );
+}
+
 static void check_body ( const char *s ) {
 	if ( !strncmp ( s, audacious_player_next, strlen ( audacious_player_next ) + 1 ) ) { audacious_manage_next ( ); return; }
 	if ( !strncmp ( s, audacious_player_prev, strlen ( audacious_player_prev ) + 1 ) ) { audacious_manage_prev ( ); return; }
+	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
 }
 
 static void *handle ( void *data ) {
-//	notify = g_notification_new ( "twitch" );
-
 	GApplication *app = ( GApplication * ) data;
-	GNotification *notify = g_notification_new ( "twitch" );
+	notify = g_notification_new ( "twitch" );
 	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
 
 	if ( audacious == 1 ) {
@@ -111,6 +128,9 @@ static void *handle ( void *data ) {
 	message = calloc ( 1024, 1 );
 	audacious_player_next = g_strdup_printf ( "@%s next", opt_nickname );
 	audacious_player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
+	opt_help = g_strdup_printf ( "@%s help", opt_nickname );
+	line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
+			
 	while ( 1 ) {
 		memset ( rbuffer, 0, size );
 		int ret = read ( sockfd, rbuffer, size );
@@ -151,7 +171,6 @@ static void *handle ( void *data ) {
 			copy_to_room ( room, &s );
 			s++;
 			copy_to_message ( message, &s );
-			//printf ( "%s: %s\n", nick, message );
 			gchar *body = g_strdup_printf ( "%s: %s", nick, message );
 			g_notification_set_body ( notify, body );
 			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
