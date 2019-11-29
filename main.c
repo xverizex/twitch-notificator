@@ -120,9 +120,11 @@ void print_help ( ) {
 }
 
 static void check_body ( const char *s ) {
-	if ( !strncmp ( s, audacious_player_next, strlen ( audacious_player_next ) + 1 ) ) { audacious_manage_next ( ); return; }
-	if ( !strncmp ( s, audacious_player_prev, strlen ( audacious_player_prev ) + 1 ) ) { audacious_manage_prev ( ); return; }
-	if ( !strncmp ( s, audacious_player_track, strlen ( audacious_player_track ) + 1 ) ) { audacious_manage_track ( ); return; }
+	if ( audacious ) {
+		if ( !strncmp ( s, audacious_player_next, strlen ( audacious_player_next ) + 1 ) ) { audacious_manage_next ( ); return; }
+		if ( !strncmp ( s, audacious_player_prev, strlen ( audacious_player_prev ) + 1 ) ) { audacious_manage_prev ( ); return; }
+		if ( !strncmp ( s, audacious_player_track, strlen ( audacious_player_track ) + 1 ) ) { audacious_manage_track ( ); return; }
+	}
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
 }
 
