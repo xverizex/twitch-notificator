@@ -13,14 +13,18 @@ const char *content =
 "token=\n"
 "channel=\n"
 "nickname=\n"
+"audacious=false\n"
 ;
 const char *str_token = "token=";
 const char *str_channel = "channel=";
 const char *str_nickname = "nickname=";
+const char *str_audacious = "audacious=";
 
 extern char *opt_oauth;
 extern char *opt_channel;
 extern char *opt_nickname;
+extern int audacious;
+char *opt_audacious;
 
 static void create_config_file ( const char *file ) {
 	FILE *fp = fopen ( file, "w" );
@@ -46,16 +50,26 @@ static void parse_nickname ( const char *s ) {
 		opt_nickname[i] = *s++;
 	}
 }
+static void parse_audacious ( const char *s ) {
+	s += strlen ( str_audacious );
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
+		opt_audacious[i] = *s++;
+	}
+	if ( !strncmp ( opt_audacious, "true", 5 ) ) { audacious = 1; return; }
+	if ( !strncmp ( opt_audacious, "false", 6 ) ) { audacious = 0; return; }
+}
 
 static void parse_file ( const char *file ) {
 	FILE *fp = fopen ( file, "r" );
 	char *line = calloc ( 255, 1 );
+	opt_audacious = calloc ( 255, 1 );
 	char *s;
 
 	while ( s = fgets ( line, 254, fp ) ) {
 		if ( !strncmp ( str_token, s, strlen ( str_token ) ) ) { parse_token ( s ); continue; }
 		if ( !strncmp ( str_channel, s, strlen ( str_channel ) ) ) { parse_channel ( s ); continue; }
 		if ( !strncmp ( str_nickname, s, strlen ( str_nickname ) ) ) { parse_nickname ( s ); continue; }
+		if ( !strncmp ( str_audacious, s, strlen ( str_audacious ) ) ) { parse_audacious ( s ); continue; }
 	}
 }
 

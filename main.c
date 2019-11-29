@@ -29,6 +29,11 @@ char *opt_oauth;
 char *opt_channel;
 char *opt_nickname;
 
+int audacious;
+
+gchar *audacious_player_next;
+gchar *audacious_player_prev;
+
 static void buffers_init ( ) {
 	rbuffer = calloc ( size, 1 );
 	sbuffer = calloc ( 1024, 1 );
@@ -36,21 +41,49 @@ static void buffers_init ( ) {
 
 static void copy_to_nick ( char *n, char **s ) {
 	(*s)++;
-	while ( *(*s) != '!' && *(*s) != 0x0 ) {
+	while ( *(*s) != '!' && *(*s) != 0x0 && *(*s) != '\r' ) {
 		*n++ = *(*s)++;
 	}
 }
 static void copy_to_room ( char *n, char **s ) {
 	(*s)++;
-	while ( *(*s) != '\n' && *(*s) != ' ' && *(*s) != 0x0 ) {
+	while ( *(*s) != '\n' && *(*s) != ' ' && *(*s) != 0x0 && *(*s) != '\r' ) {
 		*n++ = *(*s)++;
 	}
 }
 static void copy_to_message ( char *n, char **s ) {
 	(*s)++;
-	while ( *(*s) != '\n' && *(*s) != 0x0 ) {
+	while ( *(*s) != '\n' && *(*s) != 0x0 && *(*s) != '\r' ) {
 		*n++ = *(*s)++;
 	}
+}
+
+GDBusProxy *audacious_proxy;
+
+void audacious_manage_next ( ) {
+	g_dbus_proxy_call_sync ( audacious_proxy,
+			"Next",
+			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			NULL
+			);
+}
+void audacious_manage_prev ( ) {
+	g_dbus_proxy_call_sync ( audacious_proxy,
+			"Previous",
+			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			NULL
+			);
+}
+
+static void check_body ( const char *s ) {
+	if ( !strncmp ( s, audacious_player_next, strlen ( audacious_player_next ) + 1 ) ) { audacious_manage_next ( ); return; }
+	if ( !strncmp ( s, audacious_player_prev, strlen ( audacious_player_prev ) + 1 ) ) { audacious_manage_prev ( ); return; }
 }
 
 static void *handle ( void *data ) {
@@ -60,9 +93,24 @@ static void *handle ( void *data ) {
 	GNotification *notify = g_notification_new ( "twitch" );
 	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
 
+	if ( audacious == 1 ) {
+		audacious_proxy = g_dbus_proxy_new_for_bus_sync (
+				G_BUS_TYPE_SESSION,
+				G_DBUS_PROXY_FLAGS_NONE,
+				NULL,
+				"org.atheme.audacious",
+				"/org/mpris/MediaPlayer2",
+				"org.mpris.MediaPlayer2.Player",
+				NULL,
+				NULL
+				);
+	}
+
 	nick = calloc ( 255, 1 );
 	room = calloc ( 255, 1 );
 	message = calloc ( 1024, 1 );
+	audacious_player_next = g_strdup_printf ( "@%s next", opt_nickname );
+	audacious_player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
 	while ( 1 ) {
 		memset ( rbuffer, 0, size );
 		int ret = read ( sockfd, rbuffer, size );
@@ -101,12 +149,13 @@ static void *handle ( void *data ) {
 		if ( !strncmp ( s, msg, length_msg ) ) {
 			s += length_msg + 1;
 			copy_to_room ( room, &s );
-			s ++;
+			s++;
 			copy_to_message ( message, &s );
 			//printf ( "%s: %s\n", nick, message );
 			gchar *body = g_strdup_printf ( "%s: %s", nick, message );
 			g_notification_set_body ( notify, body );
 			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
+			check_body ( message );
 			g_free ( body );
 		}
 		memset ( rbuffer, 0, size );
@@ -177,5 +226,6 @@ int main ( int argc, char **argv ) {
 	g_application_register ( app, NULL, NULL );
 	g_signal_connect ( app, "activate", G_CALLBACK ( g_startup ), NULL );
 	ret = g_application_run ( app, argc, argv );
+	g_object_unref ( app );
 	return ret;
 }
