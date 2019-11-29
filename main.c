@@ -9,9 +9,9 @@
 #include <pthread.h>
 #include <string.h>
 #include <unistd.h>
-#include <gtk/gtk.h>
-#include <libnotify/notify.h>
-#include "oauth.h"
+#include <glib-2.0/glib.h>
+#include <glib-2.0/gio/gio.h>
+#include "parser.h"
 
 int sockfd;
 int size = 16384;
@@ -25,38 +25,41 @@ char *message;
 char *nick;
 char *room;
 
-NotifyNotification *notify;
+char *opt_oauth;
+char *opt_channel;
+char *opt_nickname;
 
 static void buffers_init ( ) {
 	rbuffer = calloc ( size, 1 );
 	sbuffer = calloc ( 1024, 1 );
 }
 
-void copy_to_nick ( char *n, char **s ) {
+static void copy_to_nick ( char *n, char **s ) {
 	(*s)++;
 	while ( *(*s) != '!' && *(*s) != 0x0 ) {
 		*n++ = *(*s)++;
 	}
 }
-void copy_to_room ( char *n, char **s ) {
+static void copy_to_room ( char *n, char **s ) {
 	(*s)++;
 	while ( *(*s) != '\n' && *(*s) != ' ' && *(*s) != 0x0 ) {
 		*n++ = *(*s)++;
 	}
 }
-void copy_to_message ( char *n, char **s ) {
+static void copy_to_message ( char *n, char **s ) {
 	(*s)++;
 	while ( *(*s) != '\n' && *(*s) != 0x0 ) {
 		*n++ = *(*s)++;
 	}
 }
 
-void *handle ( void *data ) {
+static void *handle ( void *data ) {
 //	notify = g_notification_new ( "twitch" );
 
-	notify_init ( "twitch-bot" );
-	notify = notify_notification_new ( "twitch", "body", NULL );
-	notify_notification_set_timeout ( notify, NOTIFY_EXPIRES_NEVER );
+	GApplication *app = ( GApplication * ) data;
+	GNotification *notify = g_notification_new ( "twitch" );
+	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
+
 	nick = calloc ( 255, 1 );
 	room = calloc ( 255, 1 );
 	message = calloc ( 1024, 1 );
@@ -68,7 +71,7 @@ void *handle ( void *data ) {
 			continue;
 		}
 		if ( !strncmp ( rbuffer, rping, strlen ( rping ) ) ) {
-			printf ( "Отправляется pong\n" );
+			//printf ( "Sending pong\n" );
 			char *pong = "PONG :tmi.twitch.tv\n";
 			int len = strlen ( pong );
 			write ( sockfd, pong, len );
@@ -90,10 +93,9 @@ void *handle ( void *data ) {
 		if ( !strncmp ( s, join, length_join ) ) {
 			s += length_join + 1;
 			copy_to_room ( room, &s );
-			//printf ( "%s вошёл в комнату %s\n", nick, room );
 			gchar *body = g_strdup_printf ( "%s вошёл в комнату %s", nick, room );
-			notify_notification_update ( notify, "twitch", body, NULL );
-			notify_notification_show ( notify, NULL );
+			g_notification_set_body ( notify, body );
+			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
 			g_free ( body );
 		} else 
 		if ( !strncmp ( s, msg, length_msg ) ) {
@@ -101,17 +103,12 @@ void *handle ( void *data ) {
 			copy_to_room ( room, &s );
 			s ++;
 			copy_to_message ( message, &s );
-			printf ( "%s: %s\n", nick, message );
+			//printf ( "%s: %s\n", nick, message );
 			gchar *body = g_strdup_printf ( "%s: %s", nick, message );
-			notify_notification_update ( notify, "twitch", body, NULL );
-			notify_notification_show ( notify, NULL );
+			g_notification_set_body ( notify, body );
+			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
 			g_free ( body );
 		}
-#if 0
-		FILE *fp = fopen ( "log", "a" );
-		fprintf ( fp, rbuffer, strlen ( rbuffer ) );
-		fclose ( fp );
-#endif
 		memset ( rbuffer, 0, size );
 		memset ( nick, 0, 255 );
 		memset ( room, 0, 255 );
@@ -137,32 +134,48 @@ static void connect_to ( const char *site, unsigned short port ) {
 	}
 }
 
+static void init_opts ( ) {
+	opt_oauth = calloc ( 255, 1 );
+	opt_channel = calloc ( 255, 1 );
+	opt_nickname = calloc ( 255, 1 );
+}
+
+static void g_startup ( GApplication *app, gpointer data ) {
+	pthread_t t1;
+	pthread_create ( &t1, NULL, handle, app );
+	pthread_join ( t1, NULL );
+}
+
 int main ( int argc, char **argv ) {
+	init_opts ( );
+	parser_config_init ( );
 	daemon ( 1, 1 );
 	buffers_init ( );
-	pthread_t t1;
 	connect_to ( "irc.chat.twitch.tv", 6667 );
 
-	sprintf ( sbuffer, "PASS %s\n", oauth );
+	sprintf ( sbuffer, "PASS %s\n", opt_oauth );
 	int ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
 	if ( ret == -1 ) {
 		perror ( "write" );
 	}
 	memset ( sbuffer, 0, 1024 );
-	sprintf ( sbuffer, "NICK %s\n", my_nick );
+	sprintf ( sbuffer, "NICK %s\n", opt_nickname );
 	ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
 	if ( ret == -1 ) {
 		perror ( "write" );
 	}
 	memset ( sbuffer, 0, 1024 );
-	sprintf ( sbuffer, "JOIN #%s\n", channel );
+	sprintf ( sbuffer, "JOIN #%s\n", opt_channel );
 	ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
 	if ( ret == -1 ) {
 		perror ( "write" );
 	}
-	pthread_create ( &t1, NULL, handle, NULL );
 
-	GMainLoop *loop = g_main_loop_new ( NULL, TRUE );
-
-	g_main_loop_run ( loop );
+	GApplication *app;
+	app = g_application_new ( "com.xverizex.twitch-bot", G_APPLICATION_FLAGS_NONE );
+	const gchar *g_id = g_application_get_application_id ( app );
+	g_application_register ( app, NULL, NULL );
+	g_signal_connect ( app, "activate", G_CALLBACK ( g_startup ), NULL );
+	ret = g_application_run ( app, argc, argv );
+	return ret;
 }
