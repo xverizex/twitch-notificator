@@ -31,6 +31,7 @@ char *room;
 const char *commands =
 "next - audacious перключение песни вперед. "
 "prev - audacious переключение песни назад. "
+"track - audacious показывает информацию о текущей песне. "
 "help - эта справка"
 ;
 
@@ -44,6 +45,7 @@ int audacious;
 
 gchar *audacious_player_next;
 gchar *audacious_player_prev;
+gchar *audacious_player_track;
 
 static void buffers_init ( ) {
 	rbuffer = calloc ( size, 1 );
@@ -92,6 +94,24 @@ void audacious_manage_prev ( ) {
 			);
 }
 
+void audacious_manage_track ( ) {
+	GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
+	GVariant *title = g_variant_lookup_value ( var, "xesam:title", NULL );
+	GVariant *album = g_variant_lookup_value ( var, "xesam:album", NULL );
+	gsize length;
+
+	gchar *message = g_strdup_printf ( "альбом: %s. песня: %s", g_variant_get_string ( album, &length ), g_variant_get_string ( title, &length ) );
+	gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+
+	write ( sockfd, body, strlen ( body ) );
+	g_free ( body );
+	g_free ( message );
+
+	g_variant_unref ( album );
+	g_variant_unref ( title );
+	g_variant_unref ( var );
+}
+
 
 void print_help ( ) {
 	gchar *body = g_strdup_printf ( "%s%s\r\n", line_for_message, commands );
@@ -102,6 +122,7 @@ void print_help ( ) {
 static void check_body ( const char *s ) {
 	if ( !strncmp ( s, audacious_player_next, strlen ( audacious_player_next ) + 1 ) ) { audacious_manage_next ( ); return; }
 	if ( !strncmp ( s, audacious_player_prev, strlen ( audacious_player_prev ) + 1 ) ) { audacious_manage_prev ( ); return; }
+	if ( !strncmp ( s, audacious_player_track, strlen ( audacious_player_track ) + 1 ) ) { audacious_manage_track ( ); return; }
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
 }
 
@@ -128,6 +149,7 @@ static void *handle ( void *data ) {
 	message = calloc ( 1024, 1 );
 	audacious_player_next = g_strdup_printf ( "@%s next", opt_nickname );
 	audacious_player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
+	audacious_player_track = g_strdup_printf ( "@%s track", opt_nickname );
 	opt_help = g_strdup_printf ( "@%s help", opt_nickname );
 	line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
 			
