@@ -29,9 +29,9 @@ char *nick;
 char *room;
 
 const char *commands =
-"next - audacious перключение песни вперед. "
-"prev - audacious переключение песни назад. "
-"track - audacious показывает информацию о текущей песне. "
+"next - ( audacious или rhythmbox ) перключение песни вперед. "
+"prev - ( audacious или rhythmbox ) переключение песни назад. "
+"track - ( audacious или rhythmbox ) показывает информацию о текущей песне. "
 "help - эта справка"
 ;
 
@@ -42,10 +42,11 @@ char *opt_channel;
 char *opt_nickname;
 
 int audacious;
+int rhythmbox;
 
-gchar *audacious_player_next;
-gchar *audacious_player_prev;
-gchar *audacious_player_track;
+gchar *player_next;
+gchar *player_prev;
+gchar *player_track;
 
 static void buffers_init ( ) {
 	rbuffer = calloc ( size, 1 );
@@ -72,6 +73,7 @@ static void copy_to_message ( char *n, char **s ) {
 }
 
 GDBusProxy *audacious_proxy;
+GDBusProxy *rhythmbox_proxy;
 
 void audacious_manage_next ( ) {
 	g_dbus_proxy_call_sync ( audacious_proxy,
@@ -85,6 +87,26 @@ void audacious_manage_next ( ) {
 }
 void audacious_manage_prev ( ) {
 	g_dbus_proxy_call_sync ( audacious_proxy,
+			"Previous",
+			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			NULL
+			);
+}
+void rhythmbox_manage_next ( ) {
+	g_dbus_proxy_call_sync ( rhythmbox_proxy,
+			"Next",
+			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			NULL
+			);
+}
+void rhythmbox_manage_prev ( ) {
+	g_dbus_proxy_call_sync ( rhythmbox_proxy,
 			"Previous",
 			NULL,
 			G_DBUS_CALL_FLAGS_NONE,
@@ -111,6 +133,23 @@ void audacious_manage_track ( ) {
 	g_variant_unref ( title );
 	g_variant_unref ( var );
 }
+void rhythmbox_manage_track ( ) {
+	GVariant *var = g_dbus_proxy_get_cached_property ( rhythmbox_proxy, "Metadata" );
+	GVariant *title = g_variant_lookup_value ( var, "xesam:title", NULL );
+	GVariant *album = g_variant_lookup_value ( var, "xesam:album", NULL );
+	gsize length;
+
+	gchar *message = g_strdup_printf ( "альбом: %s. песня: %s", g_variant_get_string ( album, &length ), g_variant_get_string ( title, &length ) );
+	gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+
+	write ( sockfd, body, strlen ( body ) );
+	g_free ( body );
+	g_free ( message );
+
+	g_variant_unref ( album );
+	g_variant_unref ( title );
+	g_variant_unref ( var );
+}
 
 
 void print_help ( ) {
@@ -120,11 +159,40 @@ void print_help ( ) {
 }
 
 static void check_body ( const char *s ) {
-	if ( audacious ) {
-		if ( !strncmp ( s, audacious_player_next, strlen ( audacious_player_next ) + 1 ) ) { audacious_manage_next ( ); return; }
-		if ( !strncmp ( s, audacious_player_prev, strlen ( audacious_player_prev ) + 1 ) ) { audacious_manage_prev ( ); return; }
-		if ( !strncmp ( s, audacious_player_track, strlen ( audacious_player_track ) + 1 ) ) { audacious_manage_track ( ); return; }
-	}
+	do {
+		if ( audacious ) {
+			if ( !strncmp ( s, player_next, strlen ( player_next ) + 1 ) ) { 
+				audacious_manage_next ( ); 
+				break;
+			}
+			if ( !strncmp ( s, player_prev, strlen ( player_prev ) + 1 ) ) { 
+				audacious_manage_prev ( ); 
+				break;
+			}
+			if ( !strncmp ( s, player_track, strlen ( player_track ) + 1 ) ) { 
+				audacious_manage_track ( ); 
+				break;
+			}
+		}
+		break;
+	} while ( 0 );
+	do {
+		if ( rhythmbox ) {
+			if ( !strncmp ( s, player_next, strlen ( player_next ) + 1 ) ) { 
+				rhythmbox_manage_next ( );
+				break;
+			}
+			if ( !strncmp ( s, player_prev, strlen ( player_prev ) + 1 ) ) { 
+				rhythmbox_manage_prev ( );
+				break;
+			}
+			if ( !strncmp ( s, player_track, strlen ( player_track ) + 1 ) ) { 
+				rhythmbox_manage_track ( );
+				break;
+			}
+		}
+	} while ( 0 );
+
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
 }
 
@@ -145,13 +213,25 @@ static void *handle ( void *data ) {
 				NULL
 				);
 	}
+	if ( rhythmbox == 1 ) {
+		rhythmbox_proxy = g_dbus_proxy_new_for_bus_sync (
+				G_BUS_TYPE_SESSION,
+				G_DBUS_PROXY_FLAGS_NONE,
+				NULL,
+				"org.gnome.UPnP.MediaServer2.Rhythmbox",
+				"/org/mpris/MediaPlayer2",
+				"org.mpris.MediaPlayer2.Player",
+				NULL,
+				NULL
+				);
+	}
 
 	nick = calloc ( 255, 1 );
 	room = calloc ( 255, 1 );
 	message = calloc ( 1024, 1 );
-	audacious_player_next = g_strdup_printf ( "@%s next", opt_nickname );
-	audacious_player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
-	audacious_player_track = g_strdup_printf ( "@%s track", opt_nickname );
+	player_next = g_strdup_printf ( "@%s next", opt_nickname );
+	player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
+	player_track = g_strdup_printf ( "@%s track", opt_nickname );
 	opt_help = g_strdup_printf ( "@%s help", opt_nickname );
 	line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
 			
