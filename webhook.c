@@ -288,6 +288,10 @@ static void copy_to_struct ( int *idx, const char *ss, const char *s ) {
 		free ( str );
 		return;
 	}
+	if ( *idx == 0 ) {
+		error_var = 1;
+		return;
+	}
 
 	if ( *idx > 0 && !strncmp ( str, str_http1, strlen ( str_http1 ) + 1 ) ) {
 		*idx += pos;
@@ -345,12 +349,14 @@ static void parse_line ( const char **p ) {
 	for ( ; *s != 0x0; s++ ) {
 		if ( *s == '\n' ) {
 			copy_to_struct ( &idx, ss, s );
+			if ( error_var ) return;
 			ss = s + 1;
 			if ( req_end ) break;
 			break;
 		}
 		if ( *s == ' ' ) {
 			copy_to_struct ( &idx, ss, s );
+			if ( error_var ) return;
 			ss = s + 1;
 			if ( req_end ) break;
 		}
@@ -420,7 +426,9 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 
 	char *follower = calloc ( 255, 1 );
 	
-	if ( dt.type_of_request == 0 ) goto error;
+	if ( dt.type_of_request == 0 ) {
+		goto error;
+	}
 
 	switch ( dt.type_of_request ) {
 		case GET_REQUEST:
