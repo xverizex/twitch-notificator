@@ -440,6 +440,10 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 			{
 				int num = get_get_var ( "hub.challenge" );
 				if ( num == -1 ) break;
+				int ret = check_num ( dt.get.value[num] );
+				if ( ret == -1 ) {
+					break;
+				}
 				char *answer = calloc ( 255, 1 );
 				int length = strlen ( dt.get.value[num] );
 				snprintf ( answer, 254,
