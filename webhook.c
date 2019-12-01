@@ -290,6 +290,7 @@ static void copy_to_struct ( int *idx, const char *ss, const char *s ) {
 	}
 	if ( *idx == 0 ) {
 		*idx += pos;
+		free ( str );
 		error_var = 1;
 		return;
 	}
