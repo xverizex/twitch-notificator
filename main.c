@@ -53,6 +53,7 @@ int n_client_id;
 unsigned short port_event;
 int audacious;
 int rhythmbox;
+int uid;
 
 gchar *player_next;
 gchar *player_prev;

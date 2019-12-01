@@ -18,6 +18,7 @@ const char *content =
 "client-id=\n"
 "port-event=\n"
 "callback=\n"
+"user_uid=\n"
 ;
 const char *str_token = "token=";
 const char *str_channel = "channel=";
@@ -27,6 +28,7 @@ const char *str_rhythmbox = "rhythmbox=";
 const char *str_client_id = "client-id=";
 const char *str_port_event = "port-event=";
 const char *str_callback = "callback=";
+const char *str_uid = "user-uid=";
 
 extern char *opt_oauth;
 extern char *opt_channel;
@@ -37,6 +39,7 @@ extern int n_client_id;
 extern unsigned short port_event;
 extern int audacious;
 extern int rhythmbox;
+extern int uid;
 char *opt_audacious;
 char *opt_rhythmbox;
 
@@ -88,6 +91,17 @@ static void parse_port_event ( const char *s ) {
 	}
 	port_event = atoi ( port );
 }
+static void parse_uid ( const char *s ) {
+	const char *must_be = s;
+	s += strlen ( str_uid );
+	const char *id = s;
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++, s++ ) {
+		if ( *s >= '0' && *s <= '9' ) continue;
+		fprintf ( stderr, "It must be number %s\n", must_be );
+		exit ( EXIT_FAILURE );
+	}
+	uid = atoi ( id );
+}
 static void parse_audacious ( const char *s ) {
 	s += strlen ( str_audacious );
 	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
@@ -121,6 +135,7 @@ static void parse_file ( const char *file ) {
 		if ( !strncmp ( str_client_id, s, strlen ( str_client_id ) ) ) { parse_client_id ( s ); continue; }
 		if ( !strncmp ( str_port_event, s, strlen ( str_port_event ) ) )  { parse_port_event ( s ); continue; }
 		if ( !strncmp ( str_callback, s, strlen ( str_callback ) ) ) { parse_callback ( s ); continue; }
+		if ( !strncmp ( str_uid, s, strlen ( str_uid ) ) ) { parse_uid ( s ); continue; }
 	}
 }
 

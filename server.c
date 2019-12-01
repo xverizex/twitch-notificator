@@ -5,11 +5,13 @@
 #include <arpa/inet.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <pwd.h>
 #include <json-c/json.h>
 #include "webhook.h"
 
 int sockserver;
 extern unsigned short port_event;
+extern int uid;
 
 void *handle_server ( void *usr_data ) {
 	GApplication *app = ( GApplication * ) usr_data;
@@ -44,6 +46,13 @@ void *handle_server ( void *usr_data ) {
 	socklen_t size = sizeof ( client );
 	char *data = calloc ( 16384, 1 );
 
+	char *user_name = getenv ( "USER" );
+	if ( user_name ) {
+		struct passwd *pw = getpwnam ( user_name );
+		if ( pw->pw_uid == 0 ) {
+			setuid ( uid );
+		}
+	}
 	while ( 1 ) {
 		int sockclient = accept ( sockserver, ( struct sockaddr * ) &client, &size );
 		int ret;
