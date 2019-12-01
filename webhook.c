@@ -289,6 +289,7 @@ static void copy_to_struct ( int *idx, const char *ss, const char *s ) {
 		return;
 	}
 	if ( *idx == 0 ) {
+		*idx += pos;
 		error_var = 1;
 		return;
 	}
@@ -380,6 +381,10 @@ static void parse_line ( const char **p ) {
 	if ( dt.type_of_request == GET_REQUEST ) return;
 
 	int content_length = get_head_var ( "Content-Length" );
+	if ( content_length == -1 ) { 
+		error_var = 1;
+		return;
+	}
 
 	char *num = dt.head.value[content_length];
 
@@ -426,7 +431,7 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 
 	char *follower = calloc ( 255, 1 );
 	
-	if ( dt.type_of_request == 0 ) {
+	if ( dt.type_of_request == 0 || error_var ) {
 		goto error;
 	}
 
