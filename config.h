@@ -1,2 +1,0 @@
-
-#define WEBHOOK        1
