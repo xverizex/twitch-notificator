@@ -25,7 +25,7 @@ for opt do
 	optval="${opt#*=}"
 	case "$opt" in
 		--prefix=*) prefix_default=${optval};;
-		--enable_webhook) webhook=1;;
+		--enable-webhook) webhook=1;;
 		--help) show_help;;
 		*) show_help;;
 	esac
