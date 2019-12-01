@@ -11,7 +11,13 @@
 #include <unistd.h>
 #include <glib-2.0/glib.h>
 #include <glib-2.0/gio/gio.h>
+#include <signal.h>
+#include "config.h"
 #include "parser.h"
+#ifdef WEBHOOK
+#include "subscribe.h"
+#include "server.h"
+#endif
 
 GNotification *notify;
 
@@ -40,13 +46,29 @@ const char *opt_help;
 char *opt_oauth;
 char *opt_channel;
 char *opt_nickname;
+char *opt_client_id;
+char *opt_callback;
 
+int n_client_id;
+unsigned short port_event;
 int audacious;
 int rhythmbox;
 
 gchar *player_next;
 gchar *player_prev;
 gchar *player_track;
+
+void sig_handle ( int sig ) {
+	switch ( sig ) {
+		case SIGINT:
+#ifdef WEBHOOK 
+			subscribe ( 0 );
+#endif
+			sleep ( 3 );
+			exit ( EXIT_SUCCESS );
+			break;
+	}
+}
 
 static void buffers_init ( ) {
 	rbuffer = calloc ( size, 1 );
@@ -310,19 +332,34 @@ static void init_opts ( ) {
 	opt_oauth = calloc ( 255, 1 );
 	opt_channel = calloc ( 255, 1 );
 	opt_nickname = calloc ( 255, 1 );
+	opt_client_id = calloc ( 255, 1 );
+	opt_callback = calloc ( 255, 1 );
 }
 
 static void g_startup ( GApplication *app, gpointer data ) {
-	pthread_t t1;
+	pthread_t t1, t2;
 	pthread_create ( &t1, NULL, handle, app );
+#ifdef WEBHOOK
+	if ( n_client_id ) pthread_create ( &t2, NULL, handle_server, app ); 
+
+	subscribe_init ( );
+	connect_for_webhook ( );
+	subscribe ( 1 );
+#endif
+
 	pthread_join ( t1, NULL );
 }
 
 int main ( int argc, char **argv ) {
 	init_opts ( );
 	parser_config_init ( );
+
+
 	daemon ( 1, 1 );
 	buffers_init ( );
+
+	signal ( SIGINT, sig_handle );
+
 	connect_to ( "irc.chat.twitch.tv", 6667 );
 
 	sprintf ( sbuffer, "PASS %s\n", opt_oauth );

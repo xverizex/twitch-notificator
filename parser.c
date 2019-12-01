@@ -15,16 +15,26 @@ const char *content =
 "nickname=\n"
 "audacious=false\n"
 "rhythmbox=false\n"
+"client-id=\n"
+"port-event=\n"
+"callback=\n"
 ;
 const char *str_token = "token=";
 const char *str_channel = "channel=";
 const char *str_nickname = "nickname=";
 const char *str_audacious = "audacious=";
 const char *str_rhythmbox = "rhythmbox=";
+const char *str_client_id = "client-id=";
+const char *str_port_event = "port-event=";
+const char *str_callback = "callback=";
 
 extern char *opt_oauth;
 extern char *opt_channel;
 extern char *opt_nickname;
+extern char *opt_client_id;
+extern char *opt_callback;
+extern int n_client_id;
+extern unsigned short port_event;
 extern int audacious;
 extern int rhythmbox;
 char *opt_audacious;
@@ -53,6 +63,30 @@ static void parse_nickname ( const char *s ) {
 	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
 		opt_nickname[i] = *s++;
 	}
+}
+static void parse_callback ( const char *s ) {
+	s += strlen ( str_callback );
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
+		opt_callback[i] = *s++;
+	}
+}
+static void parse_client_id ( const char *s ) {
+	s += strlen ( str_client_id );
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
+		opt_client_id[i] = *s++;
+	}
+	n_client_id = 1;
+}
+static void parse_port_event ( const char *s ) {
+	const char *must_be = s;
+	s += strlen ( str_port_event );
+	const char *port = s;
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++, s++ ) {
+		if ( *s >= '0' && *s <= '9' ) continue;
+		fprintf ( stderr, "It must be number %s\n", must_be );
+		exit ( EXIT_FAILURE );
+	}
+	port_event = atoi ( port );
 }
 static void parse_audacious ( const char *s ) {
 	s += strlen ( str_audacious );
@@ -84,6 +118,9 @@ static void parse_file ( const char *file ) {
 		if ( !strncmp ( str_nickname, s, strlen ( str_nickname ) ) ) { parse_nickname ( s ); continue; }
 		if ( !strncmp ( str_audacious, s, strlen ( str_audacious ) ) ) { parse_audacious ( s ); continue; }
 		if ( !strncmp ( str_rhythmbox, s, strlen ( str_rhythmbox ) ) ) { parse_rhythmbox ( s ); continue; }
+		if ( !strncmp ( str_client_id, s, strlen ( str_client_id ) ) ) { parse_client_id ( s ); continue; }
+		if ( !strncmp ( str_port_event, s, strlen ( str_port_event ) ) )  { parse_port_event ( s ); continue; }
+		if ( !strncmp ( str_callback, s, strlen ( str_callback ) ) ) { parse_callback ( s ); continue; }
 	}
 }
 

@@ -1,0 +1,64 @@
+#!/bin/bash
+#
+# cymix configure script
+#
+
+prefix_default="/usr/local"
+confdir_default="${prefix_default}/etc"
+
+show_help(){
+	cat <<EOF
+Usage: configure [options]
+Options: [defaults in brackets after descriptions]
+
+Help options:
+  --help                        print this message
+Standard options:
+  --prefix=PREFIX               install in PREFIX [$prefix_default]
+  --enable-webhook              включить webhook для получения уведомлений о новых фоловерах
+EOF
+ exit 0
+}
+echo "" > config.h
+webhook=0
+for opt do
+	optval="${opt#*=}"
+	case "$opt" in
+		--prefix=*) prefix_default=${optval};;
+		--enable_webhook) webhook=1;;
+		--help) show_help;;
+		*) show_help;;
+	esac
+done
+WEBHOOK_LIBS=
+WEBHOOK_CFLAGS=
+SOURCES_WEBHOOK=
+if [ $webhook -eq 1 ]
+then
+	WEBHOOK_LIBS=',libssl,json-c'
+	WEBHOOK_CFLAGS=',libssl,json-c'
+	SOURCES_WEBHOOK='subscribe.c server.c webhook.c'
+	echo "#define WEBHOOK        1" >> config.h
+fi
+
+
+SOURCES='main.c parser.c'
+
+STANDARD_LIBS='glib-2.0,gio-2.0'
+STANDARD_CFLAGS='glib-2.0,gio-2.0'
+LIB=`pkg-config --libs ${STANDARD_LIBS}${WEBHOOK_LIBS} --cflags ${STANDARD_LIBS}${WEBHOOK_CFLAGS}`
+FLAGS=''
+SOMELIBS='-pthread'
+CC=gcc
+PRG=twitch-bot
+
+cat > makefile <<EOF
+all:
+	${CC} ${FLAGS} ${SOURCES} ${SOURCES_WEBHOOK} ${LIB} ${SOMELIBS} -o ${PRG}
+install:
+	install ${PRG} ${prefix_default}/bin
+clean:
+	rm ${PRG}
+uninstall:
+	rm ${prefix_default}/bin/${PRG}
+EOF
