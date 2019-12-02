@@ -367,15 +367,22 @@ static void parse_line ( const char **p ) {
 	const char *s = *p;
 	const char *ss = s;
 	int idx = 0;
+	int space = 0;
 	for ( ; *s != 0x0; s++ ) {
 		if ( *s == '\n' ) {
 			copy_to_struct ( &idx, ss, s );
 			if ( error_var ) return;
+			req_end = 1;
 			ss = s + 1;
 			if ( req_end ) break;
 			break;
 		}
 		if ( *s == ' ' ) {
+			space++;
+			if ( space >= 3 ) {
+				error_var = 1;
+				return;
+			}
 			copy_to_struct ( &idx, ss, s );
 			if ( error_var ) return;
 			ss = s + 1;
