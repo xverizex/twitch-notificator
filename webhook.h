@@ -18,4 +18,28 @@
  * -------------------------------------------------------------------/
  */
 #include <glib-2.0/gio/gio.h>
+
+struct get_req {
+	char *line;
+	char **var;
+	char **value;
+	int max_count;
+};
+struct post_req {
+	char *line;
+	char *body;
+	unsigned int length;
+};
+struct header {
+	char **var;
+	char **value;
+	int max_count;
+};
+struct data {
+	struct get_req get;
+	struct post_req post;
+	int type_of_request;
+	struct header head;
+};
+
 void handle_data ( const int sockclient, const char *buffer, GApplication *app );

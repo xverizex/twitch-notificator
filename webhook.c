@@ -23,31 +23,12 @@
 #include <glib-2.0/gio/gio.h>
 #include <json-c/json.h>
 #include <string.h>
+#include "webhook.h"
 
 #define GET_REQUEST         1
 #define POST_REQUEST        2
-struct get_req {
-	char *line;
-	char **var;
-	char **value;
-	int max_count;
-};
-struct post_req {
-	char *line;
-	char *body;
-	unsigned int length;
-};
-struct header {
-	char **var;
-	char **value;
-	int max_count;
-};
-struct data {
-	struct get_req get;
-	struct post_req post;
-	int type_of_request;
-	struct header head;
-} *dt;
+
+extern struct data *dt;
 
 int find_r ( const char *ss, const int length ) {
 	for ( int i = 0; i < length; i++ ) {
@@ -442,10 +423,6 @@ char follower[255];
 
 void handle_data ( const int sockclient, const char *buffer, GApplication *app ) {
 
-	struct data d;
-	memset ( &d, 0, sizeof ( d ) );
-	dt = &d;
-
 	dt->get.line = calloc ( 0, 1 );
 	dt->get.var = calloc ( 0, 1 );
 	dt->get.value = calloc ( 0, 1 );
@@ -453,6 +430,9 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 	dt->post.body = calloc ( 0, 1 );
 	dt->head.var = calloc ( 0, 1 );
 	dt->head.value = calloc ( 0, 1 );
+	dt->get.max_count = 0;
+	dt->head.max_count = 0;
+	dt->post.length = 0;
 
 	parse_request ( buffer );
 
@@ -541,4 +521,42 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 			}
 			break;
 	}
+
+	for ( int i = 0; i < dt->get.max_count; i++ ) {
+		if ( dt->get.var[i] ) {
+			free ( dt->get.var[i] );
+			dt->get.var[i] = NULL;
+		}
+		if ( dt->get.value[i] ) {
+			free ( dt->get.value[i] );
+			dt->get.value[i] = NULL;
+		}
+	}
+	dt->get.max_count = 0;
+	if ( dt->get.line ) {
+		free ( dt->get.line );
+		dt->get.line = NULL;
+	}
+	if ( dt->post.line ) {
+		free ( dt->post.line );
+		dt->post.line = NULL;
+	}
+	dt->post.length = 0;
+	
+	if ( dt->post.body ) {
+		free ( dt->post.body );
+		dt->post.body = NULL;
+	}
+
+	for ( int i = 0; i < dt->head.max_count; i++ ) {
+		if ( dt->head.var[i] ) {
+			free ( dt->head.var[i] );
+			dt->head.var[i] = NULL;
+		}
+		if ( dt->head.value[i] ) {
+			free ( dt->head.value[i] );
+			dt->head.value[i] = NULL;
+		}
+	}
+	dt->head.max_count = 0;
 }

@@ -31,6 +31,7 @@
 #include "config.h"
 #include "parser.h"
 #ifdef WEBHOOK
+#include "webhook.h"
 #include "subscribe.h"
 #include "server.h"
 #endif
@@ -50,6 +51,11 @@ char *line_for_message;
 char *message;
 char *nick;
 char *room;
+
+#ifdef WEBHOOK
+struct data *dt;
+#endif
+
 
 const char *commands =
 "next - ( audacious или rhythmbox ) перключение песни вперед. "
@@ -83,6 +89,50 @@ pid_t pid_server_webhook;
 gchar *body;
 
 char *data_input_server;
+
+#ifdef WEBHOOK
+
+void clean_data_webhook ( ) {
+	for ( int i = 0; i < dt->get.max_count; i++ ) {
+		if ( dt->get.var[i] ) {
+			free ( dt->get.var[i] );
+			dt->get.var[i] = NULL;
+		}
+		if ( dt->get.value[i] ) {
+			free ( dt->get.value[i] );
+			dt->get.value[i] = NULL;
+		}
+	}
+	dt->get.max_count = 0;
+	if ( dt->get.line ) {
+		free ( dt->get.line );
+		dt->get.line = NULL;
+	}
+	if ( dt->post.line ) {
+		free ( dt->post.line );
+		dt->post.line = NULL;
+	}
+	dt->post.length = 0;
+
+	if ( dt->post.body ) {
+		free ( dt->post.body );
+		dt->post.body = NULL;
+	}
+
+	for ( int i = 0; i < dt->head.max_count; i++ ) {
+		if ( dt->head.var[i] ) {
+			free ( dt->head.var[i] );
+			dt->head.var[i] = NULL;
+		}
+		if ( dt->head.value[i] ) {
+			free ( dt->head.value[i] );
+			dt->head.value[i] = NULL;
+		}
+	}
+	dt->head.max_count = 0;
+}
+
+#endif
 
 void sig_handle ( int sig ) {
 	switch ( sig ) {
@@ -252,46 +302,6 @@ static void *handle ( void *data ) {
 
 	GApplication *app = global_app;
 
-	if ( !run_once ) {
-		/* пока так для наглядности, позже можно убрать в отдельную функцию и в основной поток. */
-		notify = g_notification_new ( "twitch" );
-		g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
-		if ( audacious == 1 ) {
-			audacious_proxy = g_dbus_proxy_new_for_bus_sync (
-					G_BUS_TYPE_SESSION,
-					G_DBUS_PROXY_FLAGS_NONE,
-					NULL,
-					"org.atheme.audacious",
-					"/org/mpris/MediaPlayer2",
-					"org.mpris.MediaPlayer2.Player",
-					NULL,
-					NULL
-					);
-		}
-		if ( rhythmbox == 1 ) {
-			rhythmbox_proxy = g_dbus_proxy_new_for_bus_sync (
-					G_BUS_TYPE_SESSION,
-					G_DBUS_PROXY_FLAGS_NONE,
-					NULL,
-					"org.gnome.UPnP.MediaServer2.Rhythmbox",
-					"/org/mpris/MediaPlayer2",
-					"org.mpris.MediaPlayer2.Player",
-					NULL,
-					NULL
-					);
-		}
-		nick = calloc ( 255, 1 );
-		room = calloc ( 255, 1 );
-		message = calloc ( 1024, 1 );
-		player_next = g_strdup_printf ( "@%s next", opt_nickname );
-		player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
-		player_track = g_strdup_printf ( "@%s track", opt_nickname );
-		opt_help = g_strdup_printf ( "@%s help", opt_nickname );
-		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
-		body = calloc ( 255, 1 );
-		run_once = 1;
-	}
-			
 	while ( 1 ) {
 		memset ( rbuffer, 0, size );
 		int ret = read ( sockfd, rbuffer, size );
@@ -406,6 +416,10 @@ static void init_opts ( ) {
 	data_input_server = calloc ( 4096, 1 );
 
 	body_help = calloc ( 255, 1 );
+
+#ifdef WEBHOOK
+	dt = calloc ( 1, sizeof ( struct data ) );
+#endif
 }
 gchar *object_path_iface;
 
@@ -475,6 +489,7 @@ static void connection_close_all ( ) {
 	pthread_cancel ( main_handle );
 #if WEBHOOK
 	pthread_cancel ( server_handle );
+	clean_data_webhook ( );
 #endif
 	const char *body = "Соединение разорвано";
 	g_notification_set_body ( notify, body );
@@ -571,9 +586,50 @@ static void g_startup ( GApplication *app, gpointer data ) {
 	g_main_loop_run ( loop );
 }
 
+void init_for_irc_net ( ) {
+		/* пока так для наглядности, позже можно убрать в отдельную функцию и в основной поток. */
+		notify = g_notification_new ( "twitch" );
+		g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
+		if ( audacious == 1 ) {
+			audacious_proxy = g_dbus_proxy_new_for_bus_sync (
+					G_BUS_TYPE_SESSION,
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.atheme.audacious",
+					"/org/mpris/MediaPlayer2",
+					"org.mpris.MediaPlayer2.Player",
+					NULL,
+					NULL
+					);
+		}
+		if ( rhythmbox == 1 ) {
+			rhythmbox_proxy = g_dbus_proxy_new_for_bus_sync (
+					G_BUS_TYPE_SESSION,
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.gnome.UPnP.MediaServer2.Rhythmbox",
+					"/org/mpris/MediaPlayer2",
+					"org.mpris.MediaPlayer2.Player",
+					NULL,
+					NULL
+					);
+		}
+		nick = calloc ( 255, 1 );
+		room = calloc ( 255, 1 );
+		message = calloc ( 1024, 1 );
+		player_next = g_strdup_printf ( "@%s next", opt_nickname );
+		player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
+		player_track = g_strdup_printf ( "@%s track", opt_nickname );
+		opt_help = g_strdup_printf ( "@%s help", opt_nickname );
+		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
+		body = calloc ( 255, 1 );
+		run_once = 1;
+}
+
 int main ( int argc, char **argv ) {
 	init_opts ( );
 	parser_config_init ( );
+	init_for_irc_net ( );
 
 
 	daemon ( 1, 1 );
