@@ -374,7 +374,12 @@ void join_to_channel ( ) {
 
 static void connect_to ( const char *site, unsigned short port ) {
 	struct hostent *ht = gethostbyname ( site );
+	if ( !ht ) {
+		printf ( "oh no\n" );
+		return;
+	}
 	struct sockaddr_in s;
+	memset ( &s, 0, sizeof ( s ) );
 	s.sin_family = AF_INET;
 	s.sin_port = htons ( port );
 	s.sin_addr.s_addr = *( ( in_addr_t * ) ht->h_addr );
@@ -454,6 +459,7 @@ pthread_t main_handle;
 pthread_t server_handle;
 
 static void connect_to_network ( ) {
+	sleep ( 3 );
 	connect_to ( "irc.chat.twitch.tv", 6667 );
 	join_to_channel ( );
 	pthread_create ( &main_handle, NULL, handle, global_app );

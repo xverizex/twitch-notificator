@@ -36,13 +36,9 @@ extern char *data_input_server;
 
 int close_thread;
 
-void sig_handler ( int sig ) {
-	close_thread = 1;
-}
-
 void *handle_server ( void *usr_data ) {
 	pid_server_webhook = getpid ( );
-	signal ( SIGTERM, sig_handler );
+//	signal ( SIGTERM, sig_handler );
 	GApplication *app = ( GApplication * ) usr_data;
 
 	sockserver = socket ( AF_INET, SOCK_STREAM, 0 );
@@ -83,23 +79,12 @@ void *handle_server ( void *usr_data ) {
 	}
 	while ( 1 ) {
 		memset ( data_input_server, 0, 4096 );
-		if ( close_thread ) { break; }
 		int sockclient = accept ( sockserver, ( struct sockaddr * ) &client, &size );
-		if ( close_thread ) {
-			close ( sockclient );
-			break;
-		}
 		int ret;
 		read ( sockclient, data_input_server, 4095 );
-		if ( close_thread ) {
-			close ( sockclient );
-			break;
-		}
 		handle_data ( sockclient, data_input_server, app );
 		close ( sockclient );
 	}
 
 	close ( sockserver );
-	close_thread = 0;
-	exit ( EXIT_SUCCESS );
 }

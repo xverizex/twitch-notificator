@@ -47,7 +47,7 @@ struct data {
 	struct post_req post;
 	int type_of_request;
 	struct header head;
-} dt;
+} *dt;
 
 int find_r ( const char *ss, const int length ) {
 	for ( int i = 0; i < length; i++ ) {
@@ -92,20 +92,20 @@ static void parse_get_param ( const char **p ) {
 		free ( var );
 		return;
 	}
-	int index = dt.get.max_count++;
-	dt.get.var = realloc ( dt.get.var, sizeof ( char * ) * dt.get.max_count );
-	dt.get.value = realloc ( dt.get.value, sizeof ( char * ) * dt.get.max_count );
-	dt.get.var[index] = var;
-	dt.get.value[index] = value;
+	int index = dt->get.max_count++;
+	dt->get.var = realloc ( dt->get.var, sizeof ( char * ) * dt->get.max_count );
+	dt->get.value = realloc ( dt->get.value, sizeof ( char * ) * dt->get.max_count );
+	dt->get.var[index] = var;
+	dt->get.value[index] = value;
 }
 
 static void parse_get_line_request ( const char **p ) {
 	const char *com = strchr ( *p, '?' );
 	if ( !com ) return;
 	int length = com - *p;
-	dt.get.line = realloc ( dt.get.line, length + 1 );
-	memset ( dt.get.line, 0, length + 1 );
-	strncpy ( dt.get.line, *p, length );
+	dt->get.line = realloc ( dt->get.line, length + 1 );
+	memset ( dt->get.line, 0, length + 1 );
+	strncpy ( dt->get.line, *p, length );
 	(*p) += length + 1;
 }
 
@@ -183,11 +183,11 @@ static void parse_get_request ( const char *str ) {
 		parse_get_param ( &s );
 	}
 
-	dt.get.line = normalize_line ( dt.get.line );
+	dt->get.line = normalize_line ( dt->get.line );
 
-	for ( int i = 0; i < dt.get.max_count; i++ ) {
-//		dt.get.var[i] = normalize_line ( dt.get.var[i] );
-		dt.get.value[i] = normalize_line ( dt.get.value[i] );
+	for ( int i = 0; i < dt->get.max_count; i++ ) {
+//		dt->get.var[i] = normalize_line ( dt->get.var[i] );
+		dt->get.value[i] = normalize_line ( dt->get.value[i] );
 	}
 }
 
@@ -261,27 +261,27 @@ static void parse_header ( const char *s ) {
 		return;
 	}
 
-	switch ( dt.type_of_request ) {
+	switch ( dt->type_of_request ) {
 		case GET_REQUEST:
 			{
-				int index = dt.head.max_count++;
+				int index = dt->head.max_count++;
 
-				dt.head.var = realloc ( dt.head.var, sizeof ( char * ) * dt.head.max_count );
-				dt.head.value = realloc ( dt.head.value, sizeof ( char * ) * dt.head.max_count );
+				dt->head.var = realloc ( dt->head.var, sizeof ( char * ) * dt->head.max_count );
+				dt->head.value = realloc ( dt->head.value, sizeof ( char * ) * dt->head.max_count );
 
-				dt.head.var[index] = var;
-				dt.head.value[index] = val;
+				dt->head.var[index] = var;
+				dt->head.value[index] = val;
 			}
 			break;
 		case POST_REQUEST:
 			{
-				int index = dt.head.max_count++;
+				int index = dt->head.max_count++;
 
-				dt.head.var = realloc ( dt.head.var, sizeof ( char * ) * dt.head.max_count );
-				dt.head.value = realloc ( dt.head.value, sizeof ( char * ) * dt.head.max_count );
+				dt->head.var = realloc ( dt->head.var, sizeof ( char * ) * dt->head.max_count );
+				dt->head.value = realloc ( dt->head.value, sizeof ( char * ) * dt->head.max_count );
 
-				dt.head.var[index] = var;
-				dt.head.value[index] = val;
+				dt->head.var[index] = var;
+				dt->head.value[index] = val;
 			}
 			break;
 	}
@@ -296,13 +296,13 @@ static void copy_to_struct ( int *idx, const char *ss, const char *s ) {
 	strncpy ( str, ss, length );
 
 	if ( *idx == 0 && !strncmp ( str, str_get, strlen ( str_get ) + 1 ) ) {
-		dt.type_of_request = GET_REQUEST;
+		dt->type_of_request = GET_REQUEST;
 		*idx += pos;
 		free ( str );
 		return;
 	}
 	if ( *idx == 0 && !strncmp ( str, str_post, strlen ( str_get ) + 1 ) ) {
-		dt.type_of_request = POST_REQUEST;
+		dt->type_of_request = POST_REQUEST;
 		*idx += pos;
 		free ( str );
 		return;
@@ -329,13 +329,13 @@ static void copy_to_struct ( int *idx, const char *ss, const char *s ) {
 
 	/* тело запроса */
 	if ( *idx > 0 ) {
-		switch ( dt.type_of_request ) {
+		switch ( dt->type_of_request ) {
 			case GET_REQUEST:
 				parse_get_request ( str );
 				*idx += pos;
 				return;
 			case POST_REQUEST:
-				dt.post.line = str;
+				dt->post.line = str;
 				req_end = 1;
 				break;
 		}
@@ -343,8 +343,8 @@ static void copy_to_struct ( int *idx, const char *ss, const char *s ) {
 }
 
 static int get_head_var ( const char *var ) {
-	for ( int i = 0; i < dt.head.max_count; i++ ) {
-		if ( !strncmp ( dt.head.var[i], var, strlen ( var ) + 1 ) ) return i;
+	for ( int i = 0; i < dt->head.max_count; i++ ) {
+		if ( !strncmp ( dt->head.var[i], var, strlen ( var ) + 1 ) ) return i;
 	}
 	return -1;
 }
@@ -358,9 +358,9 @@ static int check_num ( const char *s ) {
 }
 
 static void read_body ( const char *s, const int length ) {
-	dt.post.body = realloc ( dt.post.body, length + 1 );
-	memset ( dt.post.body, 0, length + 1 );
-	strncpy ( dt.post.body, s, length );
+	dt->post.body = realloc ( dt->post.body, length + 1 );
+	memset ( dt->post.body, 0, length + 1 );
+	strncpy ( dt->post.body, s, length );
 }
 
 static void parse_line ( const char **p ) {
@@ -405,7 +405,7 @@ static void parse_line ( const char **p ) {
 		}
 	}
 	(*p) += s - *p;
-	if ( dt.type_of_request == GET_REQUEST ) return;
+	if ( dt->type_of_request == GET_REQUEST ) return;
 
 	int content_length = get_head_var ( "Content-Length" );
 	if ( content_length == -1 ) { 
@@ -413,20 +413,20 @@ static void parse_line ( const char **p ) {
 		return;
 	}
 
-	char *num = dt.head.value[content_length];
+	char *num = dt->head.value[content_length];
 
 	int ret = check_num ( num );
 	if ( ret ) return;
 	unsigned int length = atoi ( num );
-	dt.post.length = length;
+	dt->post.length = length;
 	while ( *s == '\r' || *s == '\n' ) s++;
 	read_body ( s, length );
 	return;
 }
 
 static int get_get_var ( const char *var ) {
-	for ( int i = 0; i < dt.get.max_count; i++ ) {
-		if ( !strncmp ( dt.get.var[i], var, strlen ( var ) + 1 ) ) return i;
+	for ( int i = 0; i < dt->get.max_count; i++ ) {
+		if ( !strncmp ( dt->get.var[i], var, strlen ( var ) + 1 ) ) return i;
 	}
 	return -1;
 }
@@ -442,54 +442,8 @@ char *follower;
 
 void handle_data ( const int sockclient, const char *buffer, GApplication *app ) {
 
-	if ( dt.get.line ) {
-		dt.get.line = realloc ( dt.get.line, 0 );
-		dt.get.line = NULL;
-	}
-	for ( int i = 0; i < dt.get.max_count; i++ ) {
-		if ( dt.get.var[i] ) { 
-			free ( dt.get.var[i] );
-			dt.get.var[i] = NULL;
-		}
-		if ( dt.get.value[i] ) {
-			free ( dt.get.value[i] );
-			dt.get.value[i] = NULL;
-		}
-	}
-	dt.get.max_count = 0;
-	if ( dt.get.var ) {
-		dt.get.var = realloc ( dt.get.var, 0 );
-	}
-	if ( dt.get.value ) {
-		dt.get.value = realloc ( dt.get.value, 0 );
-	}
-	dt.get.max_count = 0;
-
-	if ( dt.post.line ) {
-		dt.post.line = realloc ( dt.post.line, 0 );
-	}
-	if ( dt.post.body ) {
-		dt.post.body = realloc ( dt.post.body, 0 );
-	}
-	dt.post.length = 0;
-
-	for ( int i = 0; i < dt.head.max_count; i++ ) {
-		if ( dt.head.var[i] ) { 
-			free ( dt.head.var[i] );
-			dt.head.var[i] = NULL;
-		}
-		if ( dt.head.value[i] ) {
-			free ( dt.head.value[i] );
-			dt.head.value[i] = NULL;
-		}
-	}
-	dt.head.max_count = 0;
-	if ( dt.head.var ) {
-		dt.head.var = realloc ( dt.head.var, 0 ); 
-	}
-	if ( dt.head.value ) {
-		dt.head.value = realloc ( dt.head.value, 0 );
-	}
+	struct data d = { 0 };
+	dt = &d;
 
 	parse_request ( buffer );
 
@@ -499,23 +453,23 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 
 	if ( !follower ) follower = calloc ( 255, 1 );
 	
-	if ( dt.type_of_request == 0 || error_var ) {
+	if ( dt->type_of_request == 0 || error_var ) {
 		return;
 	}
 
-	switch ( dt.type_of_request ) {
+	switch ( dt->type_of_request ) {
 		case GET_REQUEST:
 			{
 				int num = get_get_var ( "hub.challenge" );
 				if ( num == -1 ) break;
 				char *answer = calloc ( 255, 1 );
-				int length = strlen ( dt.get.value[num] );
+				int length = strlen ( dt->get.value[num] );
 				snprintf ( answer, 254,
 						"HTTP/1.0 200 OK\r\n"
 						"\r\n"
 						"%s"
 						,
-						dt.get.value[num]
+						dt->get.value[num]
 					 );
 				write ( sockclient, answer, strlen ( answer ) );
 				free ( answer );
@@ -530,7 +484,7 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 				json_object *from_name;
 				json_object *to_name;
 				enum json_tokener_error jerr;
-				root = json_tokener_parse_ex ( tok, dt.post.body, dt.post.length );
+				root = json_tokener_parse_ex ( tok, dt->post.body, dt->post.length );
 				while ( ( jerr = json_tokener_get_error ( tok ) ) == json_tokener_continue );
 				do {
 					if ( jerr != json_tokener_success ) {
@@ -580,4 +534,5 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 			}
 			break;
 	}
+	free ( follower );
 }
