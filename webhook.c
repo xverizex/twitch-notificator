@@ -438,11 +438,12 @@ static void parse_request ( const char *s ) {
 extern GNotification *notify;
 extern int sockserver;
 
-char *follower;
+char follower[255];
 
 void handle_data ( const int sockclient, const char *buffer, GApplication *app ) {
 
-	struct data d = { 0 };
+	struct data d;
+	memset ( &d, 0, sizeof ( d ) );
 	dt = &d;
 
 	parse_request ( buffer );
@@ -451,8 +452,6 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 	req_data = 0;
 
 
-	if ( !follower ) follower = calloc ( 255, 1 );
-	
 	if ( dt->type_of_request == 0 || error_var ) {
 		return;
 	}
@@ -534,5 +533,4 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 			}
 			break;
 	}
-	free ( follower );
 }
