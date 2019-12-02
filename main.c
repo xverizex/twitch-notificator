@@ -633,6 +633,7 @@ int main ( int argc, char **argv ) {
 
 
 	daemon ( 1, 1 );
+
 	buffers_init ( );
 
 	signal ( SIGINT, sig_handle );

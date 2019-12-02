@@ -151,4 +151,8 @@ void subscribe_init ( ) {
 }
 void connect_for_webhook ( ) {
 	hook_connect_to ( "api.twitch.tv", 443 );
+	SSL_clear ( ssl_hook );
+	SSL_CTX_free ( ctx_hook );
+	close ( sockhook );
+
 }
