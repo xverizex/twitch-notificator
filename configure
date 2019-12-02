@@ -58,7 +58,7 @@ all:
 install:
 	install ${PRG} ${prefix_default}/bin
 clean:
-	rm ${PRG}
+	rm ${PRG} config.h
 uninstall:
 	rm ${prefix_default}/bin/${PRG}
 EOF

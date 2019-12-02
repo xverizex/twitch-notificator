@@ -438,17 +438,58 @@ static void parse_request ( const char *s ) {
 extern GNotification *notify;
 extern int sockserver;
 
+char *follower;
+
 void handle_data ( const int sockclient, const char *buffer, GApplication *app ) {
 
-	dt.get.var = calloc ( 0, sizeof ( char * ) );
-	dt.get.value = calloc ( 0, sizeof ( char * ) );
-	dt.get.line = calloc ( 0, 1 );
+	if ( dt.get.line ) {
+		dt.get.line = realloc ( dt.get.line, 0 );
+		dt.get.line = NULL;
+	}
+	for ( int i = 0; i < dt.get.max_count; i++ ) {
+		if ( dt.get.var[i] ) { 
+			free ( dt.get.var[i] );
+			dt.get.var[i] = NULL;
+		}
+		if ( dt.get.value[i] ) {
+			free ( dt.get.value[i] );
+			dt.get.value[i] = NULL;
+		}
+	}
 	dt.get.max_count = 0;
-	dt.head.var = calloc ( 0, sizeof ( char * ) );
-	dt.head.value = calloc ( 0, sizeof ( char * ) );
+	if ( dt.get.var ) {
+		dt.get.var = realloc ( dt.get.var, 0 );
+	}
+	if ( dt.get.value ) {
+		dt.get.value = realloc ( dt.get.value, 0 );
+	}
+	dt.get.max_count = 0;
+
+	if ( dt.post.line ) {
+		dt.post.line = realloc ( dt.post.line, 0 );
+	}
+	if ( dt.post.body ) {
+		dt.post.body = realloc ( dt.post.body, 0 );
+	}
+	dt.post.length = 0;
+
+	for ( int i = 0; i < dt.head.max_count; i++ ) {
+		if ( dt.head.var[i] ) { 
+			free ( dt.head.var[i] );
+			dt.head.var[i] = NULL;
+		}
+		if ( dt.head.value[i] ) {
+			free ( dt.head.value[i] );
+			dt.head.value[i] = NULL;
+		}
+	}
 	dt.head.max_count = 0;
-	dt.post.line = calloc ( 0, 1 );
-	dt.post.body = calloc ( 0, 1 );
+	if ( dt.head.var ) {
+		dt.head.var = realloc ( dt.head.var, 0 ); 
+	}
+	if ( dt.head.value ) {
+		dt.head.value = realloc ( dt.head.value, 0 );
+	}
 
 	parse_request ( buffer );
 
@@ -456,10 +497,10 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 	req_data = 0;
 
 
-	char *follower = calloc ( 255, 1 );
+	if ( !follower ) follower = calloc ( 255, 1 );
 	
 	if ( dt.type_of_request == 0 || error_var ) {
-		goto error;
+		return;
 	}
 
 	switch ( dt.type_of_request ) {
@@ -467,19 +508,13 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 			{
 				int num = get_get_var ( "hub.challenge" );
 				if ( num == -1 ) break;
-				int ret = check_num ( dt.get.value[num] );
-				if ( ret == -1 ) {
-					break;
-				}
 				char *answer = calloc ( 255, 1 );
 				int length = strlen ( dt.get.value[num] );
 				snprintf ( answer, 254,
 						"HTTP/1.0 200 OK\r\n"
-						"Content-Length: %d\r\n"
 						"\r\n"
 						"%s"
 						,
-						length,
 						dt.get.value[num]
 					 );
 				write ( sockclient, answer, strlen ( answer ) );
@@ -545,29 +580,4 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 			}
 			break;
 	}
-error:
-
-	if ( dt.get.line ) free ( dt.get.line );
-	for ( int i = 0; i < dt.get.max_count; i++ ) {
-		free ( dt.get.var[i] );
-		free ( dt.get.value[i] );
-	}
-	if ( dt.get.var ) free ( dt.get.var );
-	if ( dt.get.value ) free ( dt.get.value );
-	dt.get.max_count = 0;
-
-	if ( dt.post.line ) free ( dt.post.line );
-	if ( dt.post.body ) free ( dt.post.body );
-	dt.post.length = 0;
-
-	for ( int i = 0; i < dt.head.max_count; i++ ) {
-		free ( dt.head.var[i] );
-		free ( dt.head.value[i] );
-	}
-	dt.head.max_count = 0;
-	if ( dt.head.var ) free ( dt.head.var );
-	if ( dt.head.value ) free ( dt.head.value );
-
-	free ( follower );
-
 }

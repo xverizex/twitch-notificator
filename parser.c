@@ -35,9 +35,10 @@ const char *content =
 "audacious=false\n"
 "rhythmbox=false\n"
 "client-id=\n"
-"port-event=\n"
+"port-event=8000\n"
 "callback=\n"
-"user_uid=\n"
+"user_uid=1000\n"
+"interface=\n"
 ;
 const char *str_token = "token=";
 const char *str_channel = "channel=";
@@ -48,12 +49,14 @@ const char *str_client_id = "client-id=";
 const char *str_port_event = "port-event=";
 const char *str_callback = "callback=";
 const char *str_uid = "user-uid=";
+const char *str_iface = "interface=";
 
 extern char *opt_oauth;
 extern char *opt_channel;
 extern char *opt_nickname;
 extern char *opt_client_id;
 extern char *opt_callback;
+extern char *opt_iface;
 extern int n_client_id;
 extern unsigned short port_event;
 extern int audacious;
@@ -84,6 +87,12 @@ static void parse_nickname ( const char *s ) {
 	s += strlen ( str_nickname );
 	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
 		opt_nickname[i] = *s++;
+	}
+}
+static void parse_interface ( const char *s ) {
+	s += strlen ( str_iface );
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
+		opt_iface[i] = *s++;
 	}
 }
 static void parse_callback ( const char *s ) {
@@ -155,6 +164,7 @@ static void parse_file ( const char *file ) {
 		if ( !strncmp ( str_port_event, s, strlen ( str_port_event ) ) )  { parse_port_event ( s ); continue; }
 		if ( !strncmp ( str_callback, s, strlen ( str_callback ) ) ) { parse_callback ( s ); continue; }
 		if ( !strncmp ( str_uid, s, strlen ( str_uid ) ) ) { parse_uid ( s ); continue; }
+		if ( !strncmp ( str_iface, s, strlen ( str_iface ) ) ) { parse_interface ( s ); continue; }
 	}
 }
 

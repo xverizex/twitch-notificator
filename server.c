@@ -31,8 +31,18 @@
 int sockserver;
 extern unsigned short port_event;
 extern int uid;
+extern pid_t pid_server_webhook;
+extern char *data_input_server;
+
+int close_thread;
+
+void sig_handler ( int sig ) {
+	close_thread = 1;
+}
 
 void *handle_server ( void *usr_data ) {
+	pid_server_webhook = getpid ( );
+	signal ( SIGTERM, sig_handler );
 	GApplication *app = ( GApplication * ) usr_data;
 
 	sockserver = socket ( AF_INET, SOCK_STREAM, 0 );
@@ -63,7 +73,6 @@ void *handle_server ( void *usr_data ) {
 	
 	struct sockaddr_in client;
 	socklen_t size = sizeof ( client );
-	char *data = calloc ( 16384, 1 );
 
 	char *user_name = getenv ( "USER" );
 	if ( user_name ) {
@@ -73,11 +82,24 @@ void *handle_server ( void *usr_data ) {
 		}
 	}
 	while ( 1 ) {
+		memset ( data_input_server, 0, 4096 );
+		if ( close_thread ) { break; }
 		int sockclient = accept ( sockserver, ( struct sockaddr * ) &client, &size );
+		if ( close_thread ) {
+			close ( sockclient );
+			break;
+		}
 		int ret;
-		read ( sockclient, data, 16383 );
-		handle_data ( sockclient, data, app );
-		memset ( data, 0, 16384 );
+		read ( sockclient, data_input_server, 4095 );
+		if ( close_thread ) {
+			close ( sockclient );
+			break;
+		}
+		handle_data ( sockclient, data_input_server, app );
 		close ( sockclient );
 	}
+
+	close ( sockserver );
+	close_thread = 0;
+	exit ( EXIT_SUCCESS );
 }

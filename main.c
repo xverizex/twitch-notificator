@@ -36,6 +36,7 @@
 #endif
 
 GNotification *notify;
+GApplication *global_app;
 
 int sockfd;
 int size = 16384;
@@ -64,6 +65,7 @@ char *opt_channel;
 char *opt_nickname;
 char *opt_client_id;
 char *opt_callback;
+char *opt_iface;
 
 int n_client_id;
 unsigned short port_event;
@@ -74,6 +76,13 @@ int uid;
 gchar *player_next;
 gchar *player_prev;
 gchar *player_track;
+
+pid_t pid_handle_irc;
+pid_t pid_server_webhook;
+
+gchar *body;
+
+char *data_input_server;
 
 void sig_handle ( int sig ) {
 	switch ( sig ) {
@@ -190,11 +199,12 @@ void rhythmbox_manage_track ( ) {
 	g_variant_unref ( var );
 }
 
+char *body_help;
+
 
 void print_help ( ) {
-	gchar *body = g_strdup_printf ( "%s%s\r\n", line_for_message, commands );
-	write ( sockfd, body, strlen ( body ) );
-	g_free ( body );
+	snprintf ( body_help, 254, "%s%s", line_for_message, commands );
+	write ( sockfd, body_help, strlen ( body_help ) );
 }
 
 static void check_body ( const char *s ) {
@@ -235,44 +245,52 @@ static void check_body ( const char *s ) {
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
 }
 
+int run_once;
+
 static void *handle ( void *data ) {
-	GApplication *app = ( GApplication * ) data;
-	notify = g_notification_new ( "twitch" );
-	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
+	pid_handle_irc = getpid ( );
 
-	if ( audacious == 1 ) {
-		audacious_proxy = g_dbus_proxy_new_for_bus_sync (
-				G_BUS_TYPE_SESSION,
-				G_DBUS_PROXY_FLAGS_NONE,
-				NULL,
-				"org.atheme.audacious",
-				"/org/mpris/MediaPlayer2",
-				"org.mpris.MediaPlayer2.Player",
-				NULL,
-				NULL
-				);
-	}
-	if ( rhythmbox == 1 ) {
-		rhythmbox_proxy = g_dbus_proxy_new_for_bus_sync (
-				G_BUS_TYPE_SESSION,
-				G_DBUS_PROXY_FLAGS_NONE,
-				NULL,
-				"org.gnome.UPnP.MediaServer2.Rhythmbox",
-				"/org/mpris/MediaPlayer2",
-				"org.mpris.MediaPlayer2.Player",
-				NULL,
-				NULL
-				);
-	}
+	GApplication *app = global_app;
 
-	nick = calloc ( 255, 1 );
-	room = calloc ( 255, 1 );
-	message = calloc ( 1024, 1 );
-	player_next = g_strdup_printf ( "@%s next", opt_nickname );
-	player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
-	player_track = g_strdup_printf ( "@%s track", opt_nickname );
-	opt_help = g_strdup_printf ( "@%s help", opt_nickname );
-	line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
+	if ( !run_once ) {
+		/* пока так для наглядности, позже можно убрать в отдельную функцию и в основной поток. */
+		notify = g_notification_new ( "twitch" );
+		g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
+		if ( audacious == 1 ) {
+			audacious_proxy = g_dbus_proxy_new_for_bus_sync (
+					G_BUS_TYPE_SESSION,
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.atheme.audacious",
+					"/org/mpris/MediaPlayer2",
+					"org.mpris.MediaPlayer2.Player",
+					NULL,
+					NULL
+					);
+		}
+		if ( rhythmbox == 1 ) {
+			rhythmbox_proxy = g_dbus_proxy_new_for_bus_sync (
+					G_BUS_TYPE_SESSION,
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.gnome.UPnP.MediaServer2.Rhythmbox",
+					"/org/mpris/MediaPlayer2",
+					"org.mpris.MediaPlayer2.Player",
+					NULL,
+					NULL
+					);
+		}
+		nick = calloc ( 255, 1 );
+		room = calloc ( 255, 1 );
+		message = calloc ( 1024, 1 );
+		player_next = g_strdup_printf ( "@%s next", opt_nickname );
+		player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
+		player_track = g_strdup_printf ( "@%s track", opt_nickname );
+		opt_help = g_strdup_printf ( "@%s help", opt_nickname );
+		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
+		body = calloc ( 255, 1 );
+		run_once = 1;
+	}
 			
 	while ( 1 ) {
 		memset ( rbuffer, 0, size );
@@ -304,26 +322,53 @@ static void *handle ( void *data ) {
 		if ( !strncmp ( s, join, length_join ) ) {
 			s += length_join + 1;
 			copy_to_room ( room, &s );
-			gchar *body = g_strdup_printf ( "%s вошёл в комнату %s", nick, room );
+			memset ( body, 0, 255 );
+			snprintf ( body, 254,
+					"%s вошёл в комнату %s",
+					nick,
+					room
+				 );
 			g_notification_set_body ( notify, body );
 			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
-			g_free ( body );
 		} else 
 		if ( !strncmp ( s, msg, length_msg ) ) {
 			s += length_msg + 1;
 			copy_to_room ( room, &s );
 			s++;
 			copy_to_message ( message, &s );
-			gchar *body = g_strdup_printf ( "%s: %s", nick, message );
+			memset ( body, 0, 255 );
+			snprintf ( body, 254,
+					"%s: %s",
+					nick,
+					message );
 			g_notification_set_body ( notify, body );
 			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
 			check_body ( message );
-			g_free ( body );
 		}
 		memset ( rbuffer, 0, size );
 		memset ( nick, 0, 255 );
 		memset ( room, 0, 255 );
 		memset ( message, 0, 1024 );
+	}
+}
+void join_to_channel ( ) {
+	memset ( sbuffer, 0, 1024 );
+	sprintf ( sbuffer, "PASS %s\n", opt_oauth );
+	int ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
+	if ( ret == -1 ) {
+		perror ( "write" );
+	}
+	memset ( sbuffer, 0, 1024 );
+	sprintf ( sbuffer, "NICK %s\n", opt_nickname );
+	ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
+	if ( ret == -1 ) {
+		perror ( "write" );
+	}
+	memset ( sbuffer, 0, 1024 );
+	sprintf ( sbuffer, "JOIN #%s\n", opt_channel );
+	ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
+	if ( ret == -1 ) {
+		perror ( "write" );
 	}
 }
 
@@ -351,20 +396,173 @@ static void init_opts ( ) {
 	opt_nickname = calloc ( 255, 1 );
 	opt_client_id = calloc ( 255, 1 );
 	opt_callback = calloc ( 255, 1 );
+	opt_iface = calloc ( 255, 1 );
+
+	data_input_server = calloc ( 4096, 1 );
+
+	body_help = calloc ( 255, 1 );
+}
+gchar *object_path_iface;
+
+static void connect_for_net_device ( ) {
+	GError *error = NULL;
+	GDBusProxy *proxy = g_dbus_proxy_new_for_bus_sync (
+			G_BUS_TYPE_SYSTEM,
+			G_DBUS_PROXY_FLAGS_NONE,
+			NULL,
+			"org.freedesktop.NetworkManager",
+			"/org/freedesktop/NetworkManager",
+			"org.freedesktop.NetworkManager",
+			NULL,
+			&error );
+
+	if ( error ) {
+		fprintf ( stderr, "%s %d: %s\n", __FILE__, __LINE__, error->message );
+		g_error_free ( error );
+		error = NULL;
+		exit ( EXIT_FAILURE );
+	}
+
+	GVariant *var = g_dbus_proxy_call_sync (
+			proxy,
+			"GetDeviceByIpIface",
+			g_variant_new ( "(s)", opt_iface ),
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			&error );
+	if ( error ) {
+		fprintf ( stderr, "%s %d: %s\n", __FILE__, __LINE__, error->message );
+		g_error_free ( error );
+		error = NULL;
+		exit ( EXIT_FAILURE );
+	}
+	if ( !var ) {
+		fprintf ( stderr, "%s: такого сетевого интерфейса не существует.\n", opt_iface );
+		exit ( EXIT_FAILURE );
+	}
+
+	object_path_iface = calloc ( 255, 1 );
+	g_variant_get ( var, "(o)", &object_path_iface );
+}
+
+
+guint power_net;
+guint trigger_net;
+
+pthread_t main_handle;
+pthread_t server_handle;
+
+static void connect_to_network ( ) {
+	connect_to ( "irc.chat.twitch.tv", 6667 );
+	join_to_channel ( );
+	pthread_create ( &main_handle, NULL, handle, global_app );
+#ifdef WEBHOOK
+	if ( n_client_id ) pthread_create ( &server_handle, NULL, handle_server, global_app ); 
+#endif
+	const char *body = "Соединение установлено";
+	g_notification_set_body ( notify, body );
+	g_application_send_notification ( global_app, "com.xverizex.twitch-bot", notify );
+}
+
+static void connection_close_all ( ) {
+	pthread_cancel ( main_handle );
+#if WEBHOOK
+	pthread_cancel ( server_handle );
+#endif
+	const char *body = "Соединение разорвано";
+	g_notification_set_body ( notify, body );
+	g_application_send_notification ( global_app, "com.xverizex.twitch-bot", notify );
+}
+
+static void handle_net_state ( GDBusConnection *con,
+		const gchar *sender_name,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *signal_name,
+		GVariant *param,
+		gpointer data
+		) {
+	guint32 num1, num2, num3;
+	g_variant_get ( param, "(uuu)", &num1, &num2, &num3 );
+	if ( num1 == 100 ) {
+		power_net = 100;
+		connect_to_network ( );
+		trigger_net = 1;
+	} else if ( num1 <= 30 ) {
+		power_net = num1;
+		if ( trigger_net ) {
+			connection_close_all ( );
+			trigger_net = 0;
+		}
+	}
+}
+
+static void set_signal_subscribe_to_net_status ( ) {
+	GError *error = NULL;
+	GDBusProxy *proxy = g_dbus_proxy_new_for_bus_sync (
+			G_BUS_TYPE_SYSTEM,
+			G_DBUS_PROXY_FLAGS_NONE,
+			NULL,
+			"org.freedesktop.NetworkManager",
+			object_path_iface,
+			"org.freedesktop.NetworkManager.Device",
+			NULL,
+			&error );
+	if ( error ) {
+		fprintf ( stderr, "%s %d: %s\n", __FILE__, __LINE__, error->message );
+		g_error_free ( error );
+		error = NULL;
+		exit ( EXIT_FAILURE );
+	}
+
+	GVariant *var = g_dbus_proxy_get_cached_property ( proxy, "State" );
+
+	g_variant_get ( var, "u", &power_net );
+
+	trigger_net = power_net == 100 ? 1 : 0;
+
+	GDBusConnection *con = g_dbus_proxy_get_connection ( proxy );
+
+	g_dbus_connection_signal_subscribe ( 
+			con,
+			"org.freedesktop.NetworkManager",
+			"org.freedesktop.NetworkManager.Device",
+			"StateChanged",
+			object_path_iface,
+			NULL,
+			G_DBUS_SIGNAL_FLAGS_NONE,
+			handle_net_state,
+			NULL,
+			NULL
+			);
 }
 
 static void g_startup ( GApplication *app, gpointer data ) {
-	pthread_t t1, t2;
-	pthread_create ( &t1, NULL, handle, app );
-#ifdef WEBHOOK
-	if ( n_client_id ) pthread_create ( &t2, NULL, handle_server, app ); 
 
-	subscribe_init ( );
-	connect_for_webhook ( );
-	subscribe ( 1 );
+	connect_for_net_device ( );
+	set_signal_subscribe_to_net_status ( );
+
+	if ( power_net == 100 ) {
+		connect_to ( "irc.chat.twitch.tv", 6667 );
+
+		join_to_channel ( );
+
+		pthread_create ( &main_handle, NULL, handle, app );
+
+	}
+#ifdef WEBHOOK
+	if ( power_net == 100 ) {
+		if ( n_client_id ) pthread_create ( &server_handle, NULL, handle_server, app ); 
+		subscribe_init ( );
+		connect_for_webhook ( );
+		subscribe ( 1 );
+
+	}
 #endif
 
-	pthread_join ( t1, NULL );
+	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
+	g_main_loop_run ( loop );
 }
 
 int main ( int argc, char **argv ) {
@@ -372,35 +570,19 @@ int main ( int argc, char **argv ) {
 	parser_config_init ( );
 
 
-	daemon ( 1, 1 );
+//	daemon ( 1, 1 );
 	buffers_init ( );
 
 	signal ( SIGINT, sig_handle );
 
-	connect_to ( "irc.chat.twitch.tv", 6667 );
+	int ret;
 
-	sprintf ( sbuffer, "PASS %s\n", opt_oauth );
-	int ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
-	if ( ret == -1 ) {
-		perror ( "write" );
-	}
-	memset ( sbuffer, 0, 1024 );
-	sprintf ( sbuffer, "NICK %s\n", opt_nickname );
-	ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
-	if ( ret == -1 ) {
-		perror ( "write" );
-	}
-	memset ( sbuffer, 0, 1024 );
-	sprintf ( sbuffer, "JOIN #%s\n", opt_channel );
-	ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
-	if ( ret == -1 ) {
-		perror ( "write" );
-	}
 
 	GApplication *app;
 	app = g_application_new ( "com.xverizex.twitch-bot", G_APPLICATION_FLAGS_NONE );
 	const gchar *g_id = g_application_get_application_id ( app );
 	g_application_register ( app, NULL, NULL );
+	global_app = app;
 	g_signal_connect ( app, "activate", G_CALLBACK ( g_startup ), NULL );
 	ret = g_application_run ( app, argc, argv );
 	g_object_unref ( app );
