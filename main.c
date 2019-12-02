@@ -576,7 +576,7 @@ int main ( int argc, char **argv ) {
 	parser_config_init ( );
 
 
-//	daemon ( 1, 1 );
+	daemon ( 1, 1 );
 	buffers_init ( );
 
 	signal ( SIGINT, sig_handle );

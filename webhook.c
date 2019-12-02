@@ -446,6 +446,14 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app )
 	memset ( &d, 0, sizeof ( d ) );
 	dt = &d;
 
+	dt->get.line = calloc ( 0, 1 );
+	dt->get.var = calloc ( 0, 1 );
+	dt->get.value = calloc ( 0, 1 );
+	dt->post.line = calloc ( 0, 1 );
+	dt->post.body = calloc ( 0, 1 );
+	dt->head.var = calloc ( 0, 1 );
+	dt->head.value = calloc ( 0, 1 );
+
 	parse_request ( buffer );
 
 	req_end = 0;
