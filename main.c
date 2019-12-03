@@ -186,12 +186,6 @@ void audacious_manage_track ( ) {
 		g_free ( message );
 
 		trigger_player = 1;
-	} else {
-		gchar *message = g_strdup ( "сейчас плеер audacious не включен.\n" );
-		gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
-		write ( sockfd, body, strlen ( body ) );
-		g_free ( body );
-		g_free ( message );
 	}
 
 	if ( album ) g_variant_unref ( album );
@@ -216,12 +210,6 @@ void rhythmbox_manage_track ( ) {
 		g_free ( body );
 		g_free ( message );
 		trigger_player = 1;
-	} else {
-		gchar *message = g_strdup ( "сейчас плеер rhythmbox не включен.\n" );
-		gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
-		write ( sockfd, body, strlen ( body ) );
-		g_free ( body );
-		g_free ( message );
 	}
 
 	if ( album ) g_variant_unref ( album );
@@ -273,6 +261,11 @@ static void check_body ( const char *s ) {
 			}
 		}
 	} while ( 0 );
+	if ( trigger_player == 0 ) {
+		gchar *message = g_strdup_printf ( "%s%s\n", line_for_message, "Ни один плеер не включен." );
+		write ( sockfd, message, strlen ( message ) );
+		g_free ( message );
+	}
 	trigger_player = 0;
 
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
@@ -494,6 +487,76 @@ static void handle_net_state ( GDBusConnection *con,
 		}
 	}
 }
+static void handle_rhythmbox_state ( GDBusConnection *con,
+		const gchar *sender_name,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *signal_name,
+		GVariant *param,
+		gpointer data
+		) {
+	gint64 pos;
+	g_variant_get ( param, "(x)", &pos );
+	if ( pos == 0 ) {
+		GVariant *var = g_dbus_proxy_get_cached_property ( rhythmbox_proxy, "Metadata" );
+		GVariant *title = NULL;
+		GVariant *album = NULL;
+		if ( var ) {
+			title = g_variant_lookup_value ( var, "xesam:title", NULL );
+			album = g_variant_lookup_value ( var, "xesam:album", NULL );
+		}
+		gsize length;
+
+		if ( title && album ) {
+			gchar *message = g_strdup_printf ( "Сейчас играет: альбом: %s. песня: %s", 
+					g_variant_get_string ( album, &length ), 
+					g_variant_get_string ( title, &length ) );
+			gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+	
+			write ( sockfd, body, strlen ( body ) );
+			g_free ( body );
+			g_free ( message );
+		}
+		if ( var ) g_variant_unref ( var );
+		if ( title ) g_variant_unref ( title );
+		if ( album ) g_variant_unref ( album );
+	}
+}
+static void handle_audacious_state ( GDBusConnection *con,
+		const gchar *sender_name,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *signal_name,
+		GVariant *param,
+		gpointer data
+		) {
+	gint64 pos;
+	g_variant_get ( param, "(x)", &pos );
+	if ( pos == 0 ) {
+		GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
+		GVariant *title = NULL;
+		GVariant *album = NULL;
+		if ( var ) {
+			title = g_variant_lookup_value ( var, "xesam:title", NULL );
+			album = g_variant_lookup_value ( var, "xesam:album", NULL );
+		}
+		gsize length;
+
+		if ( title && album ) {
+			gchar *message = g_strdup_printf ( "Сейчас играет: альбом: %s. песня: %s", 
+					g_variant_get_string ( album, &length ), 
+					g_variant_get_string ( title, &length ) );
+			gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+	
+			write ( sockfd, body, strlen ( body ) );
+			g_free ( body );
+			g_free ( message );
+		}
+		if ( var ) g_variant_unref ( var );
+		if ( title ) g_variant_unref ( title );
+		if ( album ) g_variant_unref ( album );
+	}
+}
 
 static void set_signal_subscribe_to_net_status ( ) {
 	GError *error = NULL;
@@ -583,13 +646,43 @@ void init_for_irc_net ( ) {
 					G_BUS_TYPE_SESSION,
 					G_DBUS_PROXY_FLAGS_NONE,
 					NULL,
-					"org.gnome.UPnP.MediaServer2.Rhythmbox",
+					"org.gnome.Rhythmbox3",
 					"/org/mpris/MediaPlayer2",
 					"org.mpris.MediaPlayer2.Player",
 					NULL,
 					NULL
 					);
 		}
+		GDBusConnection *con_audacious = g_dbus_proxy_get_connection ( audacious_proxy );
+
+		g_dbus_connection_signal_subscribe ( 
+				con_audacious,
+				"org.atheme.audacious",
+				"org.mpris.MediaPlayer2.Player",
+				"Seeked",
+				"/org/mpris/MediaPlayer2",
+				NULL,
+				G_DBUS_SIGNAL_FLAGS_NONE,
+				handle_audacious_state,
+				NULL,
+				NULL
+				);
+
+		GDBusConnection *con_rhythmbox = g_dbus_proxy_get_connection ( rhythmbox_proxy );
+
+		g_dbus_connection_signal_subscribe ( 
+				con_rhythmbox,
+				"org.gnome.Rhythmbox3",
+				"org.mpris.MediaPlayer2.Player",
+				"Seeked",
+				"/org/mpris/MediaPlayer2",
+				NULL,
+				G_DBUS_SIGNAL_FLAGS_NONE,
+				handle_rhythmbox_state,
+				NULL,
+				NULL
+				);
+
 		nick = calloc ( 255, 1 );
 		room = calloc ( 255, 1 );
 		message = calloc ( 1024, 1 );
