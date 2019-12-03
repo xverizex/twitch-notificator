@@ -297,6 +297,7 @@ void rhythmbox_manage_prev ( ) {
 }
 
 int trigger_player;
+int trigger_player_run;
 
 void audacious_manage_track ( ) {
 	GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
@@ -322,6 +323,8 @@ void audacious_manage_track ( ) {
 	if ( album ) g_variant_unref ( album );
 	if ( title ) g_variant_unref ( title );
 	if ( var ) g_variant_unref ( var );
+
+	trigger_player_run = 1;
 }
 void rhythmbox_manage_track ( ) {
 	GVariant *var = g_dbus_proxy_get_cached_property ( rhythmbox_proxy, "Metadata" );
@@ -346,6 +349,7 @@ void rhythmbox_manage_track ( ) {
 	if ( album ) g_variant_unref ( album );
 	if ( title ) g_variant_unref ( title );
 	if ( var ) g_variant_unref ( var );
+	trigger_player_run = 1;
 }
 
 char *body_help;
@@ -395,12 +399,13 @@ static void check_body ( const char *s ) {
 
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
 
-	if ( trigger_player == 0 ) {
+	if ( trigger_player == 0 && trigger_player_run ) {
 		gchar *message = g_strdup_printf ( "%s%s\n", line_for_message, "Ни один плеер не включен." );
 		write ( sockfd, message, strlen ( message ) );
 		g_free ( message );
 	}
 
+	trigger_player_run = 0;
 	trigger_player = 0;
 }
 
