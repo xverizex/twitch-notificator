@@ -52,6 +52,9 @@ char *message;
 char *nick;
 char *room;
 
+GDBusProxy *audacious_proxy;
+GDBusProxy *rhythmbox_proxy;
+
 
 const char *commands =
 "next - ( audacious или rhythmbox ) перключение песни вперед. "
@@ -84,6 +87,10 @@ pid_t pid_server_webhook;
 
 gchar *body;
 
+guint id_audacious;
+guint id_rhythmbox;
+GDBusConnection *con_audacious;
+GDBusConnection *con_rhythmbox;
 
 void sig_handle ( int sig ) {
 	switch ( sig ) {
@@ -91,10 +98,122 @@ void sig_handle ( int sig ) {
 #ifdef WEBHOOK 
 			subscribe ( 0 );
 #endif
+			g_dbus_connection_signal_unsubscribe ( con_audacious, id_audacious );
+			g_dbus_connection_signal_unsubscribe ( con_rhythmbox, id_rhythmbox );
 			sleep ( 3 );
 			exit ( EXIT_SUCCESS );
 			break;
 	}
+}
+static void handle_player_state ( GDBusConnection *con,
+		const gchar *sender_name,
+		const gchar *object_path,
+		const gchar *interface_name,
+		const gchar *signal_name,
+		GVariant *param,
+		gpointer data
+		) {
+	gint64 pos;
+	g_variant_get ( param, "(x)", &pos );
+	if ( pos == 0 ) {
+		GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
+		GVariant *title = NULL;
+		GVariant *album = NULL;
+		if ( var ) {
+			title = g_variant_lookup_value ( var, "xesam:title", NULL );
+			album = g_variant_lookup_value ( var, "xesam:album", NULL );
+		}
+		gsize length;
+
+		if ( title && album ) {
+			gchar *message = g_strdup_printf ( "Сейчас играет: альбом: %s. песня: %s", 
+					g_variant_get_string ( album, &length ), 
+					g_variant_get_string ( title, &length ) );
+			gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+	
+			write ( sockfd, body, strlen ( body ) );
+			g_free ( body );
+			g_free ( message );
+		}
+		if ( var ) g_variant_unref ( var );
+		if ( title ) g_variant_unref ( title );
+		if ( album ) g_variant_unref ( album );
+	}
+}
+void init_for_irc_net ( ) {
+		/* пока так для наглядности, позже можно убрать в отдельную функцию и в основной поток. */
+		notify = g_notification_new ( "twitch" );
+		g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
+#if 1
+		if ( audacious == 1 ) {
+			audacious_proxy = g_dbus_proxy_new_for_bus_sync (
+					G_BUS_TYPE_SESSION,
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.atheme.audacious",
+					"/org/mpris/MediaPlayer2",
+					"org.mpris.MediaPlayer2.Player",
+					NULL,
+					NULL
+					);
+		}
+
+		if ( rhythmbox == 1 ) {
+			rhythmbox_proxy = g_dbus_proxy_new_for_bus_sync (
+					G_BUS_TYPE_SESSION,
+					G_DBUS_PROXY_FLAGS_NONE,
+					NULL,
+					"org.mpris.MediaPlayer2.rhythmbox",
+					"/org/mpris/MediaPlayer2",
+					"org.mpris.MediaPlayer2.Player",
+					NULL,
+					NULL
+					);
+		}
+
+		if ( audacious == 1 ) {
+			con_audacious = g_dbus_proxy_get_connection ( audacious_proxy );
+			id_audacious = g_dbus_connection_signal_subscribe ( 
+				con_audacious,
+				"org.atheme.audacious",
+				"org.mpris.MediaPlayer2.Player",
+				"Seeked",
+				"/org/mpris/MediaPlayer2",
+				NULL,
+				G_DBUS_SIGNAL_FLAGS_NONE,
+				handle_player_state,
+				NULL,
+				NULL
+				);
+		}
+
+		if ( rhythmbox == 1 ) {
+			con_rhythmbox = g_dbus_proxy_get_connection ( rhythmbox_proxy );
+
+			id_rhythmbox = g_dbus_connection_signal_subscribe ( 
+				con_rhythmbox,
+				"org.mpris.MediaPlayer2.rhythmbox",
+				"org.mpris.MediaPlayer2.Player",
+				"Seeked",
+				"/org/mpris/MediaPlayer2",
+				NULL,
+				G_DBUS_SIGNAL_FLAGS_NONE,
+				handle_player_state,
+				NULL,
+				NULL
+				);
+		}
+#endif
+
+		nick = calloc ( 255, 1 );
+		room = calloc ( 255, 1 );
+		message = calloc ( 1024, 1 );
+		player_next = g_strdup_printf ( "@%s next", opt_nickname );
+		player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
+		player_track = g_strdup_printf ( "@%s track", opt_nickname );
+		opt_help = g_strdup_printf ( "@%s help", opt_nickname );
+		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
+		body = calloc ( 1024, 1 );
 }
 
 static void buffers_init ( ) {
@@ -121,8 +240,6 @@ static void copy_to_message ( char *n, char **s ) {
 	}
 }
 
-GDBusProxy *audacious_proxy;
-GDBusProxy *rhythmbox_proxy;
 
 void audacious_manage_next ( ) {
 	g_dbus_proxy_call_sync ( audacious_proxy,
@@ -261,14 +378,16 @@ static void check_body ( const char *s ) {
 			}
 		}
 	} while ( 0 );
+
+	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
+
 	if ( trigger_player == 0 ) {
 		gchar *message = g_strdup_printf ( "%s%s\n", line_for_message, "Ни один плеер не включен." );
 		write ( sockfd, message, strlen ( message ) );
 		g_free ( message );
 	}
-	trigger_player = 0;
 
-	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
+	trigger_player = 0;
 }
 
 int run_once;
@@ -488,41 +607,6 @@ static void handle_net_state ( GDBusConnection *con,
 	}
 }
 
-static void handle_player_state ( GDBusConnection *con,
-		const gchar *sender_name,
-		const gchar *object_path,
-		const gchar *interface_name,
-		const gchar *signal_name,
-		GVariant *param,
-		gpointer data
-		) {
-	gint64 pos;
-	g_variant_get ( param, "(x)", &pos );
-	if ( pos == 0 ) {
-		GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
-		GVariant *title = NULL;
-		GVariant *album = NULL;
-		if ( var ) {
-			title = g_variant_lookup_value ( var, "xesam:title", NULL );
-			album = g_variant_lookup_value ( var, "xesam:album", NULL );
-		}
-		gsize length;
-
-		if ( title && album ) {
-			gchar *message = g_strdup_printf ( "Сейчас играет: альбом: %s. песня: %s", 
-					g_variant_get_string ( album, &length ), 
-					g_variant_get_string ( title, &length ) );
-			gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
-	
-			write ( sockfd, body, strlen ( body ) );
-			g_free ( body );
-			g_free ( message );
-		}
-		if ( var ) g_variant_unref ( var );
-		if ( title ) g_variant_unref ( title );
-		if ( album ) g_variant_unref ( album );
-	}
-}
 
 static void set_signal_subscribe_to_net_status ( ) {
 	GError *error = NULL;
@@ -565,6 +649,7 @@ static void set_signal_subscribe_to_net_status ( ) {
 }
 
 static void g_startup ( GApplication *app, gpointer data ) {
+	init_for_irc_net ( );
 
 	connect_for_net_device ( );
 	set_signal_subscribe_to_net_status ( );
@@ -591,88 +676,17 @@ static void g_startup ( GApplication *app, gpointer data ) {
 	g_main_loop_run ( loop );
 }
 
-void init_for_irc_net ( ) {
-		/* пока так для наглядности, позже можно убрать в отдельную функцию и в основной поток. */
-		notify = g_notification_new ( "twitch" );
-		g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
-		if ( audacious == 1 ) {
-			audacious_proxy = g_dbus_proxy_new_for_bus_sync (
-					G_BUS_TYPE_SESSION,
-					G_DBUS_PROXY_FLAGS_NONE,
-					NULL,
-					"org.atheme.audacious",
-					"/org/mpris/MediaPlayer2",
-					"org.mpris.MediaPlayer2.Player",
-					NULL,
-					NULL
-					);
-		}
-		if ( rhythmbox == 1 ) {
-			rhythmbox_proxy = g_dbus_proxy_new_for_bus_sync (
-					G_BUS_TYPE_SESSION,
-					G_DBUS_PROXY_FLAGS_NONE,
-					NULL,
-					"org.mpris.MediaPlayer2.rhythmbox",
-					"/org/mpris/MediaPlayer2",
-					"org.mpris.MediaPlayer2.Player",
-					NULL,
-					NULL
-					);
-		}
-		GDBusConnection *con_audacious = g_dbus_proxy_get_connection ( audacious_proxy );
-
-		g_dbus_connection_signal_subscribe ( 
-				con_audacious,
-				"org.atheme.audacious",
-				"org.mpris.MediaPlayer2.Player",
-				"Seeked",
-				"/org/mpris/MediaPlayer2",
-				NULL,
-				G_DBUS_SIGNAL_FLAGS_NONE,
-				handle_player_state,
-				NULL,
-				NULL
-				);
-
-#if 0
-		GDBusConnection *con_rhythmbox = g_dbus_proxy_get_connection ( rhythmbox_proxy );
-
-		g_dbus_connection_signal_subscribe ( 
-				con_rhythmbox,
-				"org.gnome.UPnP.MediaServer2.Rhythmbox",
-				"org.mpris.MediaPlayer2.Player",
-				"Seeked",
-				"/org/mpris/MediaPlayer2",
-				NULL,
-				G_DBUS_SIGNAL_FLAGS_NONE,
-				handle_player_state,
-				NULL,
-				NULL
-				);
-#endif
-
-		nick = calloc ( 255, 1 );
-		room = calloc ( 255, 1 );
-		message = calloc ( 1024, 1 );
-		player_next = g_strdup_printf ( "@%s next", opt_nickname );
-		player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
-		player_track = g_strdup_printf ( "@%s track", opt_nickname );
-		opt_help = g_strdup_printf ( "@%s help", opt_nickname );
-		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
-		body = calloc ( 1024, 1 );
-}
 
 int main ( int argc, char **argv ) {
 	init_opts ( );
 	parser_config_init ( );
-	init_for_irc_net ( );
 
+	signal ( SIGINT, sig_handle );
 
-	daemon ( 1, 1 );
 
 	buffers_init ( );
 
-	signal ( SIGINT, sig_handle );
+	daemon ( 1, 1 );
 
 	int ret;
 
