@@ -452,7 +452,7 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app, 
 
 
 	if ( dt->type_of_request == 0 || error_var ) {
-		return;
+		goto end; 
 	}
 
 	switch ( dt->type_of_request ) {
@@ -537,6 +537,8 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app, 
 			}
 			break;
 	}
+
+end:
 
 	for ( int i = 0; i < dt->get.max_count; i++ ) {
 		if ( dt->get.var[i] ) {
