@@ -52,10 +52,6 @@ char *message;
 char *nick;
 char *room;
 
-#ifdef WEBHOOK
-struct data *dt;
-#endif
-
 
 const char *commands =
 "next - ( audacious или rhythmbox ) перключение песни вперед. "
@@ -88,51 +84,6 @@ pid_t pid_server_webhook;
 
 gchar *body;
 
-char *data_input_server;
-
-#ifdef WEBHOOK
-
-void clean_data_webhook ( ) {
-	for ( int i = 0; i < dt->get.max_count; i++ ) {
-		if ( dt->get.var[i] ) {
-			free ( dt->get.var[i] );
-			dt->get.var[i] = NULL;
-		}
-		if ( dt->get.value[i] ) {
-			free ( dt->get.value[i] );
-			dt->get.value[i] = NULL;
-		}
-	}
-	dt->get.max_count = 0;
-	if ( dt->get.line ) {
-		free ( dt->get.line );
-		dt->get.line = NULL;
-	}
-	if ( dt->post.line ) {
-		free ( dt->post.line );
-		dt->post.line = NULL;
-	}
-	dt->post.length = 0;
-
-	if ( dt->post.body ) {
-		free ( dt->post.body );
-		dt->post.body = NULL;
-	}
-
-	for ( int i = 0; i < dt->head.max_count; i++ ) {
-		if ( dt->head.var[i] ) {
-			free ( dt->head.var[i] );
-			dt->head.var[i] = NULL;
-		}
-		if ( dt->head.value[i] ) {
-			free ( dt->head.value[i] );
-			dt->head.value[i] = NULL;
-		}
-	}
-	dt->head.max_count = 0;
-}
-
-#endif
 
 void sig_handle ( int sig ) {
 	switch ( sig ) {
@@ -214,46 +165,76 @@ void rhythmbox_manage_prev ( ) {
 			);
 }
 
+int trigger_player;
+
 void audacious_manage_track ( ) {
 	GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
-	GVariant *title = g_variant_lookup_value ( var, "xesam:title", NULL );
-	GVariant *album = g_variant_lookup_value ( var, "xesam:album", NULL );
+	GVariant *title = NULL;
+	GVariant *album = NULL;
+	if ( var ) {
+		title = g_variant_lookup_value ( var, "xesam:title", NULL );
+		album = g_variant_lookup_value ( var, "xesam:album", NULL );
+	}
 	gsize length;
 
-	gchar *message = g_strdup_printf ( "альбом: %s. песня: %s", g_variant_get_string ( album, &length ), g_variant_get_string ( title, &length ) );
-	gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+	if ( title && album ) {
+		gchar *message = g_strdup_printf ( "альбом: %s. песня: %s", g_variant_get_string ( album, &length ), g_variant_get_string ( title, &length ) );
+		gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
 
-	write ( sockfd, body, strlen ( body ) );
-	g_free ( body );
-	g_free ( message );
+		write ( sockfd, body, strlen ( body ) );
+		g_free ( body );
+		g_free ( message );
 
-	g_variant_unref ( album );
-	g_variant_unref ( title );
-	g_variant_unref ( var );
+		trigger_player = 1;
+	} else {
+		gchar *message = g_strdup ( "сейчас плеер audacious не включен.\n" );
+		gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+		write ( sockfd, body, strlen ( body ) );
+		g_free ( body );
+		g_free ( message );
+	}
+
+	if ( album ) g_variant_unref ( album );
+	if ( title ) g_variant_unref ( title );
+	if ( var ) g_variant_unref ( var );
 }
 void rhythmbox_manage_track ( ) {
 	GVariant *var = g_dbus_proxy_get_cached_property ( rhythmbox_proxy, "Metadata" );
-	GVariant *title = g_variant_lookup_value ( var, "xesam:title", NULL );
-	GVariant *album = g_variant_lookup_value ( var, "xesam:album", NULL );
+	GVariant *title = NULL;
+	GVariant *album = NULL;
+	if ( var ) {
+		title = g_variant_lookup_value ( var, "xesam:title", NULL );
+		album = g_variant_lookup_value ( var, "xesam:album", NULL );
+	}
 	gsize length;
 
-	gchar *message = g_strdup_printf ( "альбом: %s. песня: %s", g_variant_get_string ( album, &length ), g_variant_get_string ( title, &length ) );
-	gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+	if ( title && album ) {
+		gchar *message = g_strdup_printf ( "альбом: %s. песня: %s", g_variant_get_string ( album, &length ), g_variant_get_string ( title, &length ) );
+		gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
 
-	write ( sockfd, body, strlen ( body ) );
-	g_free ( body );
-	g_free ( message );
+		write ( sockfd, body, strlen ( body ) );
+		g_free ( body );
+		g_free ( message );
+		trigger_player = 1;
+	} else {
+		gchar *message = g_strdup ( "сейчас плеер rhythmbox не включен.\n" );
+		gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
+		write ( sockfd, body, strlen ( body ) );
+		g_free ( body );
+		g_free ( message );
+	}
 
-	g_variant_unref ( album );
-	g_variant_unref ( title );
-	g_variant_unref ( var );
+	if ( album ) g_variant_unref ( album );
+	if ( title ) g_variant_unref ( title );
+	if ( var ) g_variant_unref ( var );
 }
 
 char *body_help;
 
 
 void print_help ( ) {
-	snprintf ( body_help, 254, "%s%s", line_for_message, commands );
+	memset ( body_help, 0, 4096 );
+	snprintf ( body_help, 4095, "%s%s\n", line_for_message, commands );
 	write ( sockfd, body_help, strlen ( body_help ) );
 }
 
@@ -276,6 +257,7 @@ static void check_body ( const char *s ) {
 		break;
 	} while ( 0 );
 	do {
+		if ( trigger_player ) break;
 		if ( rhythmbox ) {
 			if ( !strncmp ( s, player_next, strlen ( player_next ) + 1 ) ) { 
 				rhythmbox_manage_next ( );
@@ -291,6 +273,7 @@ static void check_body ( const char *s ) {
 			}
 		}
 	} while ( 0 );
+	trigger_player = 0;
 
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
 }
@@ -332,8 +315,8 @@ static void *handle ( void *data ) {
 		if ( !strncmp ( s, join, length_join ) ) {
 			s += length_join + 1;
 			copy_to_room ( room, &s );
-			memset ( body, 0, 255 );
-			snprintf ( body, 254,
+			memset ( body, 0, 1024 );
+			snprintf ( body, 1023,
 					"%s вошёл в комнату %s",
 					nick,
 					room
@@ -346,8 +329,8 @@ static void *handle ( void *data ) {
 			copy_to_room ( room, &s );
 			s++;
 			copy_to_message ( message, &s );
-			memset ( body, 0, 255 );
-			snprintf ( body, 254,
+			memset ( body, 0, 1024 );
+			snprintf ( body, 1023,
 					"%s: %s",
 					nick,
 					message );
@@ -413,13 +396,7 @@ static void init_opts ( ) {
 	opt_callback = calloc ( 255, 1 );
 	opt_iface = calloc ( 255, 1 );
 
-	data_input_server = calloc ( 4096, 1 );
-
-	body_help = calloc ( 255, 1 );
-
-#ifdef WEBHOOK
-	dt = calloc ( 1, sizeof ( struct data ) );
-#endif
+	body_help = calloc ( 4096, 1 );
 }
 gchar *object_path_iface;
 
@@ -489,7 +466,6 @@ static void connection_close_all ( ) {
 	pthread_cancel ( main_handle );
 #if WEBHOOK
 	pthread_cancel ( server_handle );
-	clean_data_webhook ( );
 #endif
 	const char *body = "Соединение разорвано";
 	g_notification_set_body ( notify, body );
@@ -622,8 +598,7 @@ void init_for_irc_net ( ) {
 		player_track = g_strdup_printf ( "@%s track", opt_nickname );
 		opt_help = g_strdup_printf ( "@%s help", opt_nickname );
 		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
-		body = calloc ( 255, 1 );
-		run_once = 1;
+		body = calloc ( 1024, 1 );
 }
 
 int main ( int argc, char **argv ) {

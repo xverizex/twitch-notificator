@@ -28,7 +28,7 @@
 #define GET_REQUEST         1
 #define POST_REQUEST        2
 
-extern struct data *dt;
+struct data *dt;
 
 int find_r ( const char *ss, const int length ) {
 	for ( int i = 0; i < length; i++ ) {
@@ -421,7 +421,8 @@ extern int sockserver;
 
 char follower[255];
 
-void handle_data ( const int sockclient, const char *buffer, GApplication *app ) {
+void handle_data ( const int sockclient, const char *buffer, GApplication *app, struct data *global_dt ) {
+	dt = global_dt;
 
 	dt->get.line = calloc ( 0, 1 );
 	dt->get.var = calloc ( 0, 1 );

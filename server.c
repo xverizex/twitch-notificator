@@ -32,13 +32,67 @@ int sockserver;
 extern unsigned short port_event;
 extern int uid;
 extern pid_t pid_server_webhook;
-extern char *data_input_server;
 
-int close_thread;
+pthread_key_t key;
+static pthread_once_t once = PTHREAD_ONCE_INIT;
+
+void destruct ( void *data ) {
+	struct data *dt = ( struct data * ) data;
+
+	for ( int i = 0; i < dt->get.max_count; i++ ) {
+		if ( dt->get.var[i] ) {
+			free ( dt->get.var[i] );
+			dt->get.var[i] = NULL;
+		}
+		if ( dt->get.value[i] ) {
+			free ( dt->get.value[i] );
+			dt->get.value[i] = NULL;
+		}
+	}
+	dt->get.max_count = 0;
+	if ( dt->get.line ) {
+		free ( dt->get.line );
+		dt->get.line = NULL;
+	}
+	if ( dt->post.line ) {
+		free ( dt->post.line );
+		dt->post.line = NULL;
+	}
+	dt->post.length = 0;
+	
+	if ( dt->post.body ) {
+		free ( dt->post.body );
+		dt->post.body = NULL;
+	}
+
+	for ( int i = 0; i < dt->head.max_count; i++ ) {
+		if ( dt->head.var[i] ) {
+			free ( dt->head.var[i] );
+			dt->head.var[i] = NULL;
+		}
+		if ( dt->head.value[i] ) {
+			free ( dt->head.value[i] );
+			dt->head.value[i] = NULL;
+		}
+	}
+	dt->head.max_count = 0;
+
+	free ( dt->data_buffer );
+
+	free ( dt );
+}
+
+static void once_creator ( void ) {
+	pthread_key_create ( &key, destruct );
+}
 
 void *handle_server ( void *usr_data ) {
-	pid_server_webhook = getpid ( );
-//	signal ( SIGTERM, sig_handler );
+#if 1
+	pthread_once ( &once, once_creator );
+	pthread_setspecific ( key, calloc ( 1, sizeof ( struct data ) ) );
+	struct data *dt = pthread_getspecific ( key );
+	memset ( dt, 0, sizeof ( struct data ) );
+#endif
 	GApplication *app = ( GApplication * ) usr_data;
 
 	sockserver = socket ( AF_INET, SOCK_STREAM, 0 );
@@ -77,14 +131,15 @@ void *handle_server ( void *usr_data ) {
 			setuid ( uid );
 		}
 	}
+
+	char *data_input_server = calloc ( 4096, 1 );
+
+	dt->data_buffer = data_input_server;
 	while ( 1 ) {
-		memset ( data_input_server, 0, 4096 );
+		memset ( &data_input_server[0], 0, 4096 );
 		int sockclient = accept ( sockserver, ( struct sockaddr * ) &client, &size );
-		int ret;
 		read ( sockclient, data_input_server, 4095 );
-		handle_data ( sockclient, data_input_server, app );
+		handle_data ( sockclient, data_input_server, app, dt );
 		close ( sockclient );
 	}
-
-	close ( sockserver );
 }

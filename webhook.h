@@ -40,6 +40,8 @@ struct data {
 	struct post_req post;
 	int type_of_request;
 	struct header head;
+
+	char *data_buffer;
 };
 
-void handle_data ( const int sockclient, const char *buffer, GApplication *app );
+void handle_data ( const int sockclient, const char *buffer, GApplication *app, struct data *global_dt );
