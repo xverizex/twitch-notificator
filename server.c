@@ -79,6 +79,15 @@ void destruct ( void *data ) {
 
 	free ( dt->data_buffer );
 
+	struct json *js = &dt->json;
+
+	if ( js->tok ) free ( js->tok );
+	if ( js->root ) free ( js->root );
+	if ( js->data ) free ( js->data );
+	if ( js->array ) free ( js->array );
+	if ( js->from_name ) free ( js->from_name );
+	if ( js->to_name ) free ( js->to_name );
+
 	free ( dt );
 }
 

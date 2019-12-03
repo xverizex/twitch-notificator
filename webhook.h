@@ -18,6 +18,7 @@
  * -------------------------------------------------------------------/
  */
 #include <glib-2.0/gio/gio.h>
+#include <json-c/json.h>
 
 struct get_req {
 	char *line;
@@ -35,6 +36,15 @@ struct header {
 	char **value;
 	int max_count;
 };
+
+struct json {
+	json_tokener *tok;
+	json_object *root;
+	json_object *data;
+	json_object *array;
+	json_object *from_name;
+	json_object *to_name;
+};
 struct data {
 	struct get_req get;
 	struct post_req post;
@@ -42,6 +52,8 @@ struct data {
 	struct header head;
 
 	char *data_buffer;
+
+	struct json json;
 };
 
 void handle_data ( const int sockclient, const char *buffer, GApplication *app, struct data *global_dt );

@@ -444,6 +444,13 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app, 
 	dt->get.max_count = 0;
 	dt->head.max_count = 0;
 	dt->post.length = 0;
+	struct json *js = &dt->json;
+	js->tok = NULL;
+	js->root = NULL;
+	js->data = NULL;
+	js->array = NULL;
+	js->from_name = NULL;
+	js->to_name = NULL;
 
 	parse_request ( buffer );
 
@@ -475,50 +482,46 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app, 
 			break;
 		case POST_REQUEST:
 			{
-				json_tokener *tok = json_tokener_new ( );
-				json_object *root;
-				json_object *data;
-				json_object *array;
-				json_object *from_name;
-				json_object *to_name;
+				struct json *js = &dt->json;
+				js->tok = json_tokener_new ( );
 				enum json_tokener_error jerr;
-				root = json_tokener_parse_ex ( tok, dt->post.body, dt->post.length );
-				while ( ( jerr = json_tokener_get_error ( tok ) ) == json_tokener_continue );
+				js->root = json_tokener_parse_ex ( js->tok, dt->post.body, dt->post.length );
+				while ( ( jerr = json_tokener_get_error ( js->tok ) ) == json_tokener_continue );
 				do {
 					if ( jerr != json_tokener_success ) {
-						json_object_put ( root );
-						json_tokener_free ( tok );
+						json_object_put ( js->root );
+						json_tokener_free ( js->tok );
 						break;
 					}
-					json_tokener_free ( tok );
-					json_object_object_get_ex ( root, "data", &data );
-					if ( !data ) {
-						json_object_put ( root );
+					json_tokener_free ( js->tok );
+					json_object_object_get_ex ( js->root, "data", &js->data );
+					if ( !js->data ) {
+						json_object_put ( js->root );
 						break;
 					}
-					array = json_object_array_get_idx ( data, 0 );
-					if ( !array ) {
-						json_object_put ( data );
-						json_object_put ( root );
+					js->array = json_object_array_get_idx ( js->data, 0 );
+					if ( !js->array ) {
+						json_object_put ( js->data );
+						json_object_put ( js->root );
 						break;
 					}
-					json_object_object_get_ex ( array, "from_name", &from_name );
-					if ( !from_name ) {
-						json_object_put ( array );
-						json_object_put ( data );
-						json_object_put ( root );
+					json_object_object_get_ex ( js->array, "from_name", &js->from_name );
+					if ( !js->from_name ) {
+						json_object_put ( js->array );
+						json_object_put ( js->data );
+						json_object_put ( js->root );
 						break;
 					}
-					json_object_object_get_ex ( array, "to_name", &to_name );
-					if ( !to_name ) {
-						json_object_put ( from_name );
-						json_object_put ( array );
-						json_object_put ( data );
-						json_object_put ( root );
+					json_object_object_get_ex ( js->array, "to_name", &js->to_name );
+					if ( !js->to_name ) {
+						json_object_put ( js->from_name );
+						json_object_put ( js->array );
+						json_object_put ( js->data );
+						json_object_put ( js->root );
 						break;
 					}
-					const char *str_from_name = json_object_get_string ( from_name );
-					const char *str_to_name   = json_object_get_string ( to_name );
+					const char *str_from_name = json_object_get_string ( js->from_name );
+					const char *str_to_name   = json_object_get_string ( js->to_name );
 					memset ( follower, 0, 255 );
 					snprintf ( follower, 254,
 							"%s подписался на канал %s",
@@ -533,6 +536,11 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app, 
 					gst_element_set_state ( play_follower.pipeline, GST_STATE_PLAYING );
 #endif
 					
+					json_object_put ( js->from_name );
+					json_object_put ( js->to_name );
+					json_object_put ( js->array );
+					json_object_put ( js->data );
+					json_object_put ( js->root );
 				} while ( 0 );
 			}
 			break;
