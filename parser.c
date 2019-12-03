@@ -39,7 +39,10 @@ const char *content =
 "callback=\n"
 "user_uid=1000\n"
 "interface=\n"
+"new_message=\n"
+"new_follower=\n"
 ;
+
 const char *str_token = "token=";
 const char *str_channel = "channel=";
 const char *str_nickname = "nickname=";
@@ -50,6 +53,8 @@ const char *str_port_event = "port-event=";
 const char *str_callback = "callback=";
 const char *str_uid = "user-uid=";
 const char *str_iface = "interface=";
+const char *str_new_message = "new_message=";
+const char *str_new_follower = "new_follower=";
 
 extern char *opt_oauth;
 extern char *opt_channel;
@@ -57,6 +62,8 @@ extern char *opt_nickname;
 extern char *opt_client_id;
 extern char *opt_callback;
 extern char *opt_iface;
+extern char *opt_new_message;
+extern char *opt_new_follower;
 extern int n_client_id;
 extern unsigned short port_event;
 extern int audacious;
@@ -99,6 +106,18 @@ static void parse_callback ( const char *s ) {
 	s += strlen ( str_callback );
 	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
 		opt_callback[i] = *s++;
+	}
+}
+static void parse_new_message ( const char *s ) {
+	s += strlen ( str_new_message );
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
+		opt_new_message[i] = *s++;
+	}
+}
+static void parse_new_follower ( const char *s ) {
+	s += strlen ( str_new_follower );
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
+		opt_new_follower[i] = *s++;
 	}
 }
 static void parse_client_id ( const char *s ) {
@@ -165,6 +184,8 @@ static void parse_file ( const char *file ) {
 		if ( !strncmp ( str_callback, s, strlen ( str_callback ) ) ) { parse_callback ( s ); continue; }
 		if ( !strncmp ( str_uid, s, strlen ( str_uid ) ) ) { parse_uid ( s ); continue; }
 		if ( !strncmp ( str_iface, s, strlen ( str_iface ) ) ) { parse_interface ( s ); continue; }
+		if ( !strncmp ( str_new_message, s, strlen ( str_new_message ) ) ) { parse_new_message ( s ); continue; }
+		if ( !strncmp ( str_new_follower, s, strlen ( str_new_follower ) ) ) { parse_new_follower ( s ); continue; }
 	}
 }
 

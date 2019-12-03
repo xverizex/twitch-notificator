@@ -24,6 +24,12 @@
 #include <json-c/json.h>
 #include <string.h>
 #include "webhook.h"
+#include "config.h"
+
+#ifdef AUDIO_NOTIFICATIONS
+#include <gst/gst.h>
+#include "audio.h"
+#endif
 
 #define GET_REQUEST         1
 #define POST_REQUEST        2
@@ -421,6 +427,10 @@ extern int sockserver;
 
 char follower[255];
 
+#ifdef AUDIO_NOTIFICATIONS
+extern struct play_notification play_follower;
+#endif
+
 void handle_data ( const int sockclient, const char *buffer, GApplication *app, struct data *global_dt ) {
 	dt = global_dt;
 
@@ -517,6 +527,11 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app, 
 						 );
 					g_notification_set_body ( notify, follower );
 					g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
+#ifdef AUDIO_NOTIFICATIONS
+					gst_element_set_state ( play_follower.pipeline, GST_STATE_PAUSED );
+					gst_element_seek_simple ( play_follower.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_follower.duration );
+					gst_element_set_state ( play_follower.pipeline, GST_STATE_PLAYING );
+#endif
 					
 				} while ( 0 );
 			}

@@ -35,6 +35,10 @@
 #include "subscribe.h"
 #include "server.h"
 #endif
+#ifdef AUDIO_NOTIFICATIONS
+#include <gst/gst.h>
+#include "audio.h"
+#endif
 
 GNotification *notify;
 GApplication *global_app;
@@ -55,6 +59,10 @@ char *room;
 GDBusProxy *audacious_proxy;
 GDBusProxy *rhythmbox_proxy;
 
+#ifdef AUDIO_NOTIFICATIONS
+struct play_notification play_message, play_follower;
+#endif
+
 
 const char *commands =
 "next - ( audacious или rhythmbox ) перключение песни вперед. "
@@ -71,6 +79,8 @@ char *opt_nickname;
 char *opt_client_id;
 char *opt_callback;
 char *opt_iface;
+char *opt_new_message;
+char *opt_new_follower;
 
 int n_client_id;
 unsigned short port_event;
@@ -171,6 +181,8 @@ void init_for_irc_net ( ) {
 					);
 		}
 
+		int once_player = 0;
+
 		if ( audacious == 1 ) {
 			con_audacious = g_dbus_proxy_get_connection ( audacious_proxy );
 			id_audacious = g_dbus_connection_signal_subscribe ( 
@@ -185,8 +197,10 @@ void init_for_irc_net ( ) {
 				NULL,
 				NULL
 				);
+			once_player = 1;
 		}
 
+		if ( !once_player )
 		if ( rhythmbox == 1 ) {
 			con_rhythmbox = g_dbus_proxy_get_connection ( rhythmbox_proxy );
 
@@ -448,6 +462,10 @@ static void *handle ( void *data ) {
 					message );
 			g_notification_set_body ( notify, body );
 			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
+#ifdef AUDIO_NOTIFICATIONS
+			gst_element_seek_simple ( play_message.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_message.duration );
+			gst_element_set_state ( play_message.pipeline, GST_STATE_PLAYING );
+#endif
 			check_body ( message );
 		}
 		memset ( rbuffer, 0, size );
@@ -509,6 +527,9 @@ static void init_opts ( ) {
 	opt_iface = calloc ( 255, 1 );
 
 	body_help = calloc ( 4096, 1 );
+
+	opt_new_message = calloc ( 255, 1 );
+	opt_new_follower = calloc ( 255, 1 );
 }
 gchar *object_path_iface;
 
@@ -647,10 +668,65 @@ static void set_signal_subscribe_to_net_status ( ) {
 			NULL
 			);
 }
+#ifdef AUDIO_NOTIFICATIONS
+void on_pad_added ( GstElement *element, GstPad *pad, gpointer data ) {
+	GstPad *sinkpad;
+	GstElement *decoder = (GstElement *) data;
+
+	sinkpad = gst_element_get_static_pad ( decoder, "sink" );
+
+	gst_pad_link ( pad, sinkpad );
+
+	gst_object_unref ( sinkpad );
+}
+
+void init_struct_play ( struct play_notification *pl, const char *opt_music ) {
+	pl->pipeline = gst_pipeline_new ( "new_messages" );
+	pl->source = gst_element_factory_make ( "filesrc", NULL );
+	pl->demuxer = gst_element_factory_make ( "decodebin", NULL );
+	pl->decoder = gst_element_factory_make ( "audioconvert", NULL );
+	pl->volume = gst_element_factory_make ( "volume", NULL );
+	pl->conv = gst_element_factory_make ( "audioconvert", NULL );
+	pl->sink = gst_element_factory_make ( "autoaudiosink", NULL );
+
+	if ( !pl->pipeline || !pl->source || !pl->demuxer || !pl->decoder || !pl->volume || !pl->conv || !pl->sink ) {
+		fprintf ( stderr, "failed to init plugins\n" );
+		exit ( EXIT_FAILURE );
+	}
+
+	gst_bin_add_many ( GST_BIN ( pl->pipeline ),
+			pl->source,
+			pl->demuxer,
+			pl->decoder,
+			pl->volume,
+			pl->conv,
+			pl->sink,
+			NULL
+			);
+	gst_element_link ( pl->source, pl->demuxer );
+	gst_element_link_many ( pl->decoder, pl->volume, pl->conv, pl->sink, NULL );
+	g_signal_connect ( pl->demuxer, "pad-added", G_CALLBACK ( on_pad_added ), pl->decoder );
+
+	g_object_set ( G_OBJECT ( pl->source ), "location", opt_music, NULL );
+
+//	gst_element_query_position ( pl->pipeline, GST_FORMAT_TIME, &pl->duration );
+	pl->duration = 0;
+}
+void init_sounds ( ) {
+	gst_init ( 0, 0 );
+
+	init_struct_play ( &play_message, opt_new_message );
+	init_struct_play ( &play_follower, opt_new_follower );
+
+}
+#endif
 
 static void g_startup ( GApplication *app, gpointer data ) {
 	init_for_irc_net ( );
 
+#ifdef AUDIO_NOTIFICATIONS
+	init_sounds ( );
+#endif
 	connect_for_net_device ( );
 	set_signal_subscribe_to_net_status ( );
 
@@ -671,6 +747,7 @@ static void g_startup ( GApplication *app, gpointer data ) {
 
 	}
 #endif
+
 
 	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
 	g_main_loop_run ( loop );

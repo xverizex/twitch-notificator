@@ -16,16 +16,19 @@ Help options:
 Standard options:
   --prefix=PREFIX               install in PREFIX [$prefix_default]
   --enable-webhook              включить webhook для получения уведомлений о новых фоловерах
+  --enable-sounds               включить звуковые уведомления
 EOF
  exit 0
 }
 echo "" > config.h
 webhook=0
+sounds=0
 for opt do
 	optval="${opt#*=}"
 	case "$opt" in
 		--prefix=*) prefix_default=${optval};;
 		--enable-webhook) webhook=1;;
+		--enable-sounds) sounds=1;;
 		--help) show_help;;
 		*) show_help;;
 	esac
@@ -33,6 +36,8 @@ done
 WEBHOOK_LIBS=
 WEBHOOK_CFLAGS=
 SOURCES_WEBHOOK=
+SOUNDS_LIBS=
+SOUNDS_CFLAGS=
 if [ $webhook -eq 1 ]
 then
 	WEBHOOK_LIBS=',libssl,json-c'
@@ -41,12 +46,18 @@ then
 	echo "#define WEBHOOK        1" >> config.h
 fi
 
+if [ $sounds -eq 1 ]
+then
+	SOUNDS_LIBS=',gstreamer-1.0'
+	SOUNDS_CFLAGS=',gstreamer-1.0'
+	echo "#define AUDIO_NOTIFICATIONS    1" >> config.h
+fi
 
 SOURCES='main.c parser.c'
 
 STANDARD_LIBS='glib-2.0,gio-2.0'
 STANDARD_CFLAGS='glib-2.0,gio-2.0'
-LIB=`pkg-config --libs ${STANDARD_LIBS}${WEBHOOK_LIBS} --cflags ${STANDARD_LIBS}${WEBHOOK_CFLAGS}`
+LIB=`pkg-config --libs ${STANDARD_LIBS}${WEBHOOK_LIBS}${SOUNDS_LIBS} --cflags ${STANDARD_LIBS}${WEBHOOK_CFLAGS}${SOUNDS_CFLAGS}`
 FLAGS=''
 SOMELIBS='-pthread'
 CC=gcc
