@@ -487,42 +487,8 @@ static void handle_net_state ( GDBusConnection *con,
 		}
 	}
 }
-static void handle_rhythmbox_state ( GDBusConnection *con,
-		const gchar *sender_name,
-		const gchar *object_path,
-		const gchar *interface_name,
-		const gchar *signal_name,
-		GVariant *param,
-		gpointer data
-		) {
-	gint64 pos;
-	g_variant_get ( param, "(x)", &pos );
-	if ( pos == 0 ) {
-		GVariant *var = g_dbus_proxy_get_cached_property ( rhythmbox_proxy, "Metadata" );
-		GVariant *title = NULL;
-		GVariant *album = NULL;
-		if ( var ) {
-			title = g_variant_lookup_value ( var, "xesam:title", NULL );
-			album = g_variant_lookup_value ( var, "xesam:album", NULL );
-		}
-		gsize length;
 
-		if ( title && album ) {
-			gchar *message = g_strdup_printf ( "Сейчас играет: альбом: %s. песня: %s", 
-					g_variant_get_string ( album, &length ), 
-					g_variant_get_string ( title, &length ) );
-			gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
-	
-			write ( sockfd, body, strlen ( body ) );
-			g_free ( body );
-			g_free ( message );
-		}
-		if ( var ) g_variant_unref ( var );
-		if ( title ) g_variant_unref ( title );
-		if ( album ) g_variant_unref ( album );
-	}
-}
-static void handle_audacious_state ( GDBusConnection *con,
+static void handle_player_state ( GDBusConnection *con,
 		const gchar *sender_name,
 		const gchar *object_path,
 		const gchar *interface_name,
@@ -646,7 +612,7 @@ void init_for_irc_net ( ) {
 					G_BUS_TYPE_SESSION,
 					G_DBUS_PROXY_FLAGS_NONE,
 					NULL,
-					"org.gnome.Rhythmbox3",
+					"org.mpris.MediaPlayer2.rhythmbox",
 					"/org/mpris/MediaPlayer2",
 					"org.mpris.MediaPlayer2.Player",
 					NULL,
@@ -663,25 +629,27 @@ void init_for_irc_net ( ) {
 				"/org/mpris/MediaPlayer2",
 				NULL,
 				G_DBUS_SIGNAL_FLAGS_NONE,
-				handle_audacious_state,
+				handle_player_state,
 				NULL,
 				NULL
 				);
 
+#if 0
 		GDBusConnection *con_rhythmbox = g_dbus_proxy_get_connection ( rhythmbox_proxy );
 
 		g_dbus_connection_signal_subscribe ( 
 				con_rhythmbox,
-				"org.gnome.Rhythmbox3",
+				"org.gnome.UPnP.MediaServer2.Rhythmbox",
 				"org.mpris.MediaPlayer2.Player",
 				"Seeked",
 				"/org/mpris/MediaPlayer2",
 				NULL,
 				G_DBUS_SIGNAL_FLAGS_NONE,
-				handle_rhythmbox_state,
+				handle_player_state,
 				NULL,
 				NULL
 				);
+#endif
 
 		nick = calloc ( 255, 1 );
 		room = calloc ( 255, 1 );
