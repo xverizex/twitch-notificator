@@ -8,5 +8,5 @@ struct play_notification {
 	GstElement *decoder;
 	GstElement *conv;
 	GstElement *sink;
-	gint64 duration;
+	gint64 pos;
 };

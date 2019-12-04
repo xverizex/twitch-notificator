@@ -40,6 +40,10 @@
 #include "audio.h"
 #endif
 
+
+const char *prog = "com.xverizex.twitch-notificator";
+gchar *g_id;
+
 GNotification *notify;
 GApplication *global_app;
 
@@ -151,9 +155,6 @@ static void handle_player_state ( GDBusConnection *con,
 	}
 }
 void init_for_irc_net ( ) {
-		/* пока так для наглядности, позже можно убрать в отдельную функцию и в основной поток. */
-		notify = g_notification_new ( "twitch" );
-		g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
 #if 1
 		if ( audacious == 1 ) {
 			audacious_proxy = g_dbus_proxy_new_for_bus_sync (
@@ -453,7 +454,7 @@ static void *handle ( void *data ) {
 					room
 				 );
 			g_notification_set_body ( notify, body );
-			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
+			g_application_send_notification ( app, prog, notify );
 		} else 
 		if ( !strncmp ( s, msg, length_msg ) ) {
 			s += length_msg + 1;
@@ -466,9 +467,9 @@ static void *handle ( void *data ) {
 					nick,
 					message );
 			g_notification_set_body ( notify, body );
-			g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
+			g_application_send_notification ( app, prog, notify );
 #ifdef AUDIO_NOTIFICATIONS
-			gst_element_seek_simple ( play_message.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_message.duration );
+			gst_element_seek_simple ( play_message.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_message.pos );
 			gst_element_set_state ( play_message.pipeline, GST_STATE_PLAYING );
 #endif
 			check_body ( message );
@@ -597,7 +598,7 @@ static void connect_to_network ( ) {
 #endif
 	const char *body = "Соединение установлено";
 	g_notification_set_body ( notify, body );
-	g_application_send_notification ( global_app, "com.xverizex.twitch-bot", notify );
+	g_application_send_notification ( global_app, prog, notify );
 }
 
 static void connection_close_all ( ) {
@@ -607,7 +608,7 @@ static void connection_close_all ( ) {
 #endif
 	const char *body = "Соединение разорвано";
 	g_notification_set_body ( notify, body );
-	g_application_send_notification ( global_app, "com.xverizex.twitch-bot", notify );
+	g_application_send_notification ( global_app, prog, notify );
 }
 
 static void handle_net_state ( GDBusConnection *con,
@@ -714,8 +715,7 @@ void init_struct_play ( struct play_notification *pl, const char *opt_music ) {
 
 	g_object_set ( G_OBJECT ( pl->source ), "location", opt_music, NULL );
 
-//	gst_element_query_position ( pl->pipeline, GST_FORMAT_TIME, &pl->duration );
-	pl->duration = 0;
+	pl->pos = 0;
 }
 void init_sounds ( ) {
 	gst_init ( 0, 0 );
@@ -727,13 +727,16 @@ void init_sounds ( ) {
 #endif
 
 static void g_startup ( GApplication *app, gpointer data ) {
-	init_for_irc_net ( );
+	notify = g_notification_new ( "twitch" );
+	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
 
 #ifdef AUDIO_NOTIFICATIONS
 	init_sounds ( );
 #endif
 	connect_for_net_device ( );
 	set_signal_subscribe_to_net_status ( );
+
+	init_for_irc_net ( );
 
 	if ( power_net == 100 ) {
 		connect_to ( "irc.chat.twitch.tv", 6667 );
@@ -754,8 +757,7 @@ static void g_startup ( GApplication *app, gpointer data ) {
 #endif
 
 
-	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
-	g_main_loop_run ( loop );
+	pthread_join ( main_handle, NULL );
 }
 
 
@@ -774,9 +776,9 @@ int main ( int argc, char **argv ) {
 
 
 	GApplication *app;
-	app = g_application_new ( "com.xverizex.twitch-bot", G_APPLICATION_FLAGS_NONE );
-	const gchar *g_id = g_application_get_application_id ( app );
+	app = g_application_new ( prog, G_APPLICATION_FLAGS_NONE );
 	g_application_register ( app, NULL, NULL );
+	//const gchar *g_id = g_application_get_application_id ( app );
 	global_app = app;
 	g_signal_connect ( app, "activate", G_CALLBACK ( g_startup ), NULL );
 	ret = g_application_run ( app, argc, argv );

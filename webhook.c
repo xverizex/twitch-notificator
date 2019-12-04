@@ -31,6 +31,9 @@
 #include "audio.h"
 #endif
 
+
+extern const char *prog;
+
 #define GET_REQUEST         1
 #define POST_REQUEST        2
 
@@ -529,10 +532,10 @@ void handle_data ( const int sockclient, const char *buffer, GApplication *app, 
 							str_to_name
 						 );
 					g_notification_set_body ( notify, follower );
-					g_application_send_notification ( app, "com.xverizex.twitch-bot", notify );
+					g_application_send_notification ( app, prog, notify );
 #ifdef AUDIO_NOTIFICATIONS
 					gst_element_set_state ( play_follower.pipeline, GST_STATE_PAUSED );
-					gst_element_seek_simple ( play_follower.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_follower.duration );
+					gst_element_seek_simple ( play_follower.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_follower.pos );
 					gst_element_set_state ( play_follower.pipeline, GST_STATE_PLAYING );
 #endif
 					
