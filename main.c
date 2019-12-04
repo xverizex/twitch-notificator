@@ -728,7 +728,7 @@ void init_sounds ( ) {
 
 static void g_startup ( GApplication *app, gpointer data ) {
 	notify = g_notification_new ( "twitch" );
-	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
+	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_URGENT );
 
 #ifdef AUDIO_NOTIFICATIONS
 	init_sounds ( );
@@ -757,7 +757,8 @@ static void g_startup ( GApplication *app, gpointer data ) {
 #endif
 
 
-	pthread_join ( main_handle, NULL );
+	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
+	g_main_loop_run ( loop );
 }
 
 
