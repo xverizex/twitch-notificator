@@ -41,6 +41,7 @@ const char *content =
 "interface=\n"
 "new_message=\n"
 "new_follower=\n"
+"notify_frozen=\n"
 ;
 
 const char *str_token = "token=";
@@ -55,6 +56,7 @@ const char *str_uid = "user-uid=";
 const char *str_iface = "interface=";
 const char *str_new_message = "new_message=";
 const char *str_new_follower = "new_follower=";
+const char *str_notify_frozen = "notify_frozen=";
 
 extern char *opt_oauth;
 extern char *opt_channel;
@@ -66,11 +68,13 @@ extern char *opt_new_message;
 extern char *opt_new_follower;
 extern int n_client_id;
 extern unsigned short port_event;
+extern int notify_frozen;
 extern int audacious;
 extern int rhythmbox;
 extern int uid;
 char *opt_audacious;
 char *opt_rhythmbox;
+char *opt_notify_frozen;
 
 static void create_config_file ( const char *file ) {
 	FILE *fp = fopen ( file, "w" );
@@ -165,12 +169,21 @@ static void parse_rhythmbox ( const char *s ) {
 	if ( !strncmp ( opt_rhythmbox, "true", 5 ) ) { rhythmbox = 1; return; }
 	if ( !strncmp ( opt_rhythmbox, "false", 6 ) ) { rhythmbox = 0; return; }
 }
+static void parse_notify_frozen ( const char *s ) {
+	s += strlen ( str_notify_frozen );
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
+		opt_notify_frozen[i] = *s++;
+	}
+	if ( !strncmp ( opt_notify_frozen, "true", 5 ) ) { notify_frozen = 1; return; }
+	if ( !strncmp ( opt_notify_frozen, "false", 6 ) ) { notify_frozen = 0; return; }
+}
 
 static void parse_file ( const char *file ) {
 	FILE *fp = fopen ( file, "r" );
 	char *line = calloc ( 255, 1 );
 	opt_audacious = calloc ( 255, 1 );
 	opt_rhythmbox = calloc ( 255, 1 );
+	opt_notify_frozen = calloc ( 255, 1 );
 	char *s;
 
 	while ( s = fgets ( line, 254, fp ) ) {
@@ -186,6 +199,7 @@ static void parse_file ( const char *file ) {
 		if ( !strncmp ( str_iface, s, strlen ( str_iface ) ) ) { parse_interface ( s ); continue; }
 		if ( !strncmp ( str_new_message, s, strlen ( str_new_message ) ) ) { parse_new_message ( s ); continue; }
 		if ( !strncmp ( str_new_follower, s, strlen ( str_new_follower ) ) ) { parse_new_follower ( s ); continue; }
+		if ( !strncmp ( str_notify_frozen, s, strlen ( str_notify_frozen ) ) ) { parse_notify_frozen ( s ); continue; }
 	}
 }
 

@@ -47,6 +47,7 @@ gchar *g_id;
 GNotification *notify;
 GApplication *global_app;
 
+int show_notify_frozen;
 int sockfd;
 int size = 16384;
 char *rbuffer;
@@ -91,6 +92,7 @@ unsigned short port_event;
 int audacious;
 int rhythmbox;
 int uid;
+int notify_frozen;
 
 gchar *player_next;
 gchar *player_prev;
@@ -727,8 +729,11 @@ void init_sounds ( ) {
 #endif
 
 static void g_startup ( GApplication *app, gpointer data ) {
+	if ( notify_frozen ) show_notify_frozen = G_NOTIFICATION_PRIORITY_URGENT;
+	else show_notify_frozen = G_NOTIFICATION_PRIORITY_HIGH;
+
 	notify = g_notification_new ( "twitch" );
-	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_URGENT );
+	g_notification_set_priority ( notify, show_notify_frozen );
 
 #ifdef AUDIO_NOTIFICATIONS
 	init_sounds ( );
@@ -767,6 +772,7 @@ int main ( int argc, char **argv ) {
 	parser_config_init ( );
 
 	signal ( SIGINT, sig_handle );
+
 
 
 	buffers_init ( );
