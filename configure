@@ -15,36 +15,23 @@ Help options:
   --help                        print this message
 Standard options:
   --prefix=PREFIX               install in PREFIX [$prefix_default]
-  --enable-webhook              включить webhook для получения уведомлений о новых фоловерах
   --enable-sounds               включить звуковые уведомления
 EOF
  exit 0
 }
 echo "" > config.h
-webhook=0
 sounds=0
 for opt do
 	optval="${opt#*=}"
 	case "$opt" in
 		--prefix=*) prefix_default=${optval};;
-		--enable-webhook) webhook=1;;
 		--enable-sounds) sounds=1;;
 		--help) show_help;;
 		*) show_help;;
 	esac
 done
-WEBHOOK_LIBS=
-WEBHOOK_CFLAGS=
-SOURCES_WEBHOOK=
 SOUNDS_LIBS=
 SOUNDS_CFLAGS=
-if [ $webhook -eq 1 ]
-then
-	WEBHOOK_LIBS=',libssl,json-c'
-	WEBHOOK_CFLAGS=',libssl,json-c'
-	SOURCES_WEBHOOK='subscribe.c server.c webhook.c'
-	echo "#define WEBHOOK        1" >> config.h
-fi
 
 if [ $sounds -eq 1 ]
 then
@@ -57,7 +44,7 @@ SOURCES='main.c parser.c'
 
 STANDARD_LIBS='glib-2.0,gio-2.0'
 STANDARD_CFLAGS='glib-2.0,gio-2.0'
-LIB=`pkg-config --libs ${STANDARD_LIBS}${WEBHOOK_LIBS}${SOUNDS_LIBS} --cflags ${STANDARD_LIBS}${WEBHOOK_CFLAGS}${SOUNDS_CFLAGS}`
+LIB=`pkg-config --libs ${STANDARD_LIBS}${SOUNDS_LIBS} --cflags ${STANDARD_LIBS}${SOUNDS_CFLAGS}`
 FLAGS=''
 SOMELIBS='-pthread'
 CC=gcc
@@ -65,7 +52,7 @@ PRG=twitch-bot
 
 cat > makefile <<EOF
 all:
-	${CC} ${FLAGS} ${SOURCES} ${SOURCES_WEBHOOK} ${LIB} ${SOMELIBS} -o ${PRG}
+	${CC} ${FLAGS} ${SOURCES} ${LIB} ${SOMELIBS} -o ${PRG}
 install:
 	install ${PRG} ${prefix_default}/bin
 clean:
