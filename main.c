@@ -57,7 +57,6 @@ char *nick;
 char *room;
 
 GDBusProxy *audacious_proxy;
-GDBusProxy *rhythmbox_proxy;
 
 #ifdef AUDIO_NOTIFICATIONS
 struct play_notification play_message, play_follower;
@@ -65,9 +64,9 @@ struct play_notification play_message, play_follower;
 
 
 const char *commands =
-"next - ( audacious или rhythmbox ) перключение песни вперед. "
-"prev - ( audacious или rhythmbox ) переключение песни назад. "
-"track - ( audacious или rhythmbox ) показывает информацию о текущей песне. "
+"next - ( audacious ) перключение песни вперед. "
+"prev - ( audacious ) переключение песни назад. "
+"track - ( audacious ) показывает информацию о текущей песне. "
 "help - эта справка"
 ;
 
@@ -85,7 +84,6 @@ char *opt_new_follower;
 int n_client_id;
 unsigned short port_event;
 int audacious;
-int rhythmbox;
 int uid;
 int notify_frozen;
 
@@ -99,15 +97,12 @@ pid_t pid_server_webhook;
 gchar *body;
 
 guint id_audacious;
-guint id_rhythmbox;
 GDBusConnection *con_audacious;
-GDBusConnection *con_rhythmbox;
 
 void sig_handle ( int sig ) {
 	switch ( sig ) {
 		case SIGINT:
 			g_dbus_connection_signal_unsubscribe ( con_audacious, id_audacious );
-			g_dbus_connection_signal_unsubscribe ( con_rhythmbox, id_rhythmbox );
 			sleep ( 3 );
 			exit ( EXIT_SUCCESS );
 			break;
@@ -149,26 +144,12 @@ static void handle_player_state ( GDBusConnection *con,
 	}
 }
 void init_for_irc_net ( ) {
-#if 1
 		if ( audacious == 1 ) {
 			audacious_proxy = g_dbus_proxy_new_for_bus_sync (
 					G_BUS_TYPE_SESSION,
 					G_DBUS_PROXY_FLAGS_NONE,
 					NULL,
 					"org.atheme.audacious",
-					"/org/mpris/MediaPlayer2",
-					"org.mpris.MediaPlayer2.Player",
-					NULL,
-					NULL
-					);
-		}
-
-		if ( rhythmbox == 1 ) {
-			rhythmbox_proxy = g_dbus_proxy_new_for_bus_sync (
-					G_BUS_TYPE_SESSION,
-					G_DBUS_PROXY_FLAGS_NONE,
-					NULL,
-					"org.mpris.MediaPlayer2.rhythmbox",
 					"/org/mpris/MediaPlayer2",
 					"org.mpris.MediaPlayer2.Player",
 					NULL,
@@ -194,25 +175,6 @@ void init_for_irc_net ( ) {
 				);
 			once_player = 1;
 		}
-
-		if ( !once_player )
-		if ( rhythmbox == 1 ) {
-			con_rhythmbox = g_dbus_proxy_get_connection ( rhythmbox_proxy );
-
-			id_rhythmbox = g_dbus_connection_signal_subscribe ( 
-				con_rhythmbox,
-				"org.mpris.MediaPlayer2.rhythmbox",
-				"org.mpris.MediaPlayer2.Player",
-				"Seeked",
-				"/org/mpris/MediaPlayer2",
-				NULL,
-				G_DBUS_SIGNAL_FLAGS_NONE,
-				handle_player_state,
-				NULL,
-				NULL
-				);
-		}
-#endif
 
 		nick = calloc ( 255, 1 );
 		room = calloc ( 255, 1 );
@@ -270,26 +232,6 @@ void audacious_manage_prev ( ) {
 			NULL
 			);
 }
-void rhythmbox_manage_next ( ) {
-	g_dbus_proxy_call_sync ( rhythmbox_proxy,
-			"Next",
-			NULL,
-			G_DBUS_CALL_FLAGS_NONE,
-			-1,
-			NULL,
-			NULL
-			);
-}
-void rhythmbox_manage_prev ( ) {
-	g_dbus_proxy_call_sync ( rhythmbox_proxy,
-			"Previous",
-			NULL,
-			G_DBUS_CALL_FLAGS_NONE,
-			-1,
-			NULL,
-			NULL
-			);
-}
 
 int trigger_player;
 int trigger_player_run;
@@ -321,31 +263,6 @@ void audacious_manage_track ( ) {
 
 	trigger_player_run = 1;
 }
-void rhythmbox_manage_track ( ) {
-	GVariant *var = g_dbus_proxy_get_cached_property ( rhythmbox_proxy, "Metadata" );
-	GVariant *title = NULL;
-	GVariant *album = NULL;
-	if ( var ) {
-		title = g_variant_lookup_value ( var, "xesam:title", NULL );
-		album = g_variant_lookup_value ( var, "xesam:album", NULL );
-	}
-	gsize length;
-
-	if ( title && album ) {
-		gchar *message = g_strdup_printf ( "альбом: %s. песня: %s", g_variant_get_string ( album, &length ), g_variant_get_string ( title, &length ) );
-		gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
-
-		write ( sockfd, body, strlen ( body ) );
-		g_free ( body );
-		g_free ( message );
-		trigger_player = 1;
-	}
-
-	if ( album ) g_variant_unref ( album );
-	if ( title ) g_variant_unref ( title );
-	if ( var ) g_variant_unref ( var );
-	trigger_player_run = 1;
-}
 
 char *body_help;
 
@@ -373,23 +290,6 @@ static void check_body ( const char *s ) {
 			}
 		}
 		break;
-	} while ( 0 );
-	do {
-		if ( trigger_player ) break;
-		if ( rhythmbox ) {
-			if ( !strncmp ( s, player_next, strlen ( player_next ) + 1 ) ) { 
-				rhythmbox_manage_next ( );
-				break;
-			}
-			if ( !strncmp ( s, player_prev, strlen ( player_prev ) + 1 ) ) { 
-				rhythmbox_manage_prev ( );
-				break;
-			}
-			if ( !strncmp ( s, player_track, strlen ( player_track ) + 1 ) ) { 
-				rhythmbox_manage_track ( );
-				break;
-			}
-		}
 	} while ( 0 );
 
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }

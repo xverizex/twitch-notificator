@@ -33,7 +33,6 @@ const char *content =
 "channel=\n"
 "nickname=\n"
 "audacious=false\n"
-"rhythmbox=false\n"
 "client-id=\n"
 "port-event=8000\n"
 "callback=\n"
@@ -48,7 +47,6 @@ const char *str_token = "token=";
 const char *str_channel = "channel=";
 const char *str_nickname = "nickname=";
 const char *str_audacious = "audacious=";
-const char *str_rhythmbox = "rhythmbox=";
 const char *str_client_id = "client-id=";
 const char *str_port_event = "port-event=";
 const char *str_callback = "callback=";
@@ -70,10 +68,8 @@ extern int n_client_id;
 extern unsigned short port_event;
 extern int notify_frozen;
 extern int audacious;
-extern int rhythmbox;
 extern int uid;
 char *opt_audacious;
-char *opt_rhythmbox;
 char *opt_notify_frozen;
 
 static void create_config_file ( const char *file ) {
@@ -161,14 +157,6 @@ static void parse_audacious ( const char *s ) {
 	if ( !strncmp ( opt_audacious, "true", 5 ) ) { audacious = 1; return; }
 	if ( !strncmp ( opt_audacious, "false", 6 ) ) { audacious = 0; return; }
 }
-static void parse_rhythmbox ( const char *s ) {
-	s += strlen ( str_rhythmbox );
-	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
-		opt_rhythmbox[i] = *s++;
-	}
-	if ( !strncmp ( opt_rhythmbox, "true", 5 ) ) { rhythmbox = 1; return; }
-	if ( !strncmp ( opt_rhythmbox, "false", 6 ) ) { rhythmbox = 0; return; }
-}
 static void parse_notify_frozen ( const char *s ) {
 	s += strlen ( str_notify_frozen );
 	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
@@ -182,7 +170,6 @@ static void parse_file ( const char *file ) {
 	FILE *fp = fopen ( file, "r" );
 	char *line = calloc ( 255, 1 );
 	opt_audacious = calloc ( 255, 1 );
-	opt_rhythmbox = calloc ( 255, 1 );
 	opt_notify_frozen = calloc ( 255, 1 );
 	char *s;
 
@@ -191,7 +178,6 @@ static void parse_file ( const char *file ) {
 		if ( !strncmp ( str_channel, s, strlen ( str_channel ) ) ) { parse_channel ( s ); continue; }
 		if ( !strncmp ( str_nickname, s, strlen ( str_nickname ) ) ) { parse_nickname ( s ); continue; }
 		if ( !strncmp ( str_audacious, s, strlen ( str_audacious ) ) ) { parse_audacious ( s ); continue; }
-		if ( !strncmp ( str_rhythmbox, s, strlen ( str_rhythmbox ) ) ) { parse_rhythmbox ( s ); continue; }
 		if ( !strncmp ( str_client_id, s, strlen ( str_client_id ) ) ) { parse_client_id ( s ); continue; }
 		if ( !strncmp ( str_port_event, s, strlen ( str_port_event ) ) )  { parse_port_event ( s ); continue; }
 		if ( !strncmp ( str_callback, s, strlen ( str_callback ) ) ) { parse_callback ( s ); continue; }
