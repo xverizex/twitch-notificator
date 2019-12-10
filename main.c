@@ -30,11 +30,6 @@
 #include <signal.h>
 #include "config.h"
 #include "parser.h"
-#ifdef WEBHOOK
-#include "webhook.h"
-#include "subscribe.h"
-#include "server.h"
-#endif
 #ifdef AUDIO_NOTIFICATIONS
 #include <gst/gst.h>
 #include "audio.h"
@@ -111,9 +106,6 @@ GDBusConnection *con_rhythmbox;
 void sig_handle ( int sig ) {
 	switch ( sig ) {
 		case SIGINT:
-#ifdef WEBHOOK 
-			subscribe ( 0 );
-#endif
 			g_dbus_connection_signal_unsubscribe ( con_audacious, id_audacious );
 			g_dbus_connection_signal_unsubscribe ( con_rhythmbox, id_rhythmbox );
 			sleep ( 3 );
@@ -595,9 +587,6 @@ static void connect_to_network ( ) {
 	connect_to ( "irc.chat.twitch.tv", 6667 );
 	join_to_channel ( );
 	pthread_create ( &main_handle, NULL, handle, global_app );
-#ifdef WEBHOOK
-	if ( n_client_id ) pthread_create ( &server_handle, NULL, handle_server, global_app ); 
-#endif
 	const char *body = "Соединение установлено";
 	g_notification_set_body ( notify, body );
 	g_application_send_notification ( global_app, prog, notify );
@@ -605,9 +594,6 @@ static void connect_to_network ( ) {
 
 static void connection_close_all ( ) {
 	pthread_cancel ( main_handle );
-#if WEBHOOK
-	pthread_cancel ( server_handle );
-#endif
 	const char *body = "Соединение разорвано";
 	g_notification_set_body ( notify, body );
 	g_application_send_notification ( global_app, prog, notify );
@@ -751,15 +737,6 @@ static void g_startup ( GApplication *app, gpointer data ) {
 		pthread_create ( &main_handle, NULL, handle, app );
 
 	}
-#ifdef WEBHOOK
-	if ( power_net == 100 ) {
-		if ( n_client_id ) pthread_create ( &server_handle, NULL, handle_server, app ); 
-		subscribe_init ( );
-		connect_for_webhook ( );
-		subscribe ( 1 );
-
-	}
-#endif
 
 
 	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
