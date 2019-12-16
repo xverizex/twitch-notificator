@@ -116,9 +116,10 @@ static void handle_player_state ( GDBusConnection *con,
 		GVariant *param,
 		gpointer data
 		) {
+#if 0
 	gint64 pos;
 	g_variant_get ( param, "(x)", &pos );
-	if ( pos == 0 ) {
+	if ( !pos ) {
 		GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
 		GVariant *title = NULL;
 		GVariant *album = NULL;
@@ -159,6 +160,7 @@ static void handle_player_state ( GDBusConnection *con,
 		if ( sartist ) g_variant_unref ( sartist );
 		if ( artist ) free ( artist );
 	}
+#endif
 }
 void init_for_irc_net ( ) {
 		if ( audacious == 1 ) {
