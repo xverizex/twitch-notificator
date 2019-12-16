@@ -122,15 +122,30 @@ static void handle_player_state ( GDBusConnection *con,
 		GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
 		GVariant *title = NULL;
 		GVariant *album = NULL;
+		GVariant *sartist = NULL;
+		GVariantIter *iter = NULL;
+		char *artist = calloc ( 512, 1 );
+		char *art = NULL;
 		if ( var ) {
 			title = g_variant_lookup_value ( var, "xesam:title", NULL );
 			album = g_variant_lookup_value ( var, "xesam:album", NULL );
+			sartist = g_variant_lookup_value ( var, "xesam:artist", NULL );
+			g_variant_get ( sartist, "as", &iter );
+			while ( g_variant_iter_loop ( iter, "s", &art ) ) {
+				snprintf ( artist, 512,
+						"%s %s",
+						artist,
+						art
+					 );
+			}
+			g_variant_iter_free ( iter );
 		}
 		gsize length;
 
 		if ( title && album ) {
-			gchar *message = g_strdup_printf ( "Сейчас играет: альбом: %s. песня: %s", 
+			gchar *message = g_strdup_printf ( "Сейчас играет: альбом: %s. Исполнитель: %s. песня: %s", 
 					g_variant_get_string ( album, &length ), 
+					artist,
 					g_variant_get_string ( title, &length ) );
 			gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
 	
@@ -141,6 +156,8 @@ static void handle_player_state ( GDBusConnection *con,
 		if ( var ) g_variant_unref ( var );
 		if ( title ) g_variant_unref ( title );
 		if ( album ) g_variant_unref ( album );
+		if ( sartist ) g_variant_unref ( sartist );
+		if ( artist ) free ( artist );
 	}
 }
 void init_for_irc_net ( ) {
@@ -240,14 +257,32 @@ void audacious_manage_track ( ) {
 	GVariant *var = g_dbus_proxy_get_cached_property ( audacious_proxy, "Metadata" );
 	GVariant *title = NULL;
 	GVariant *album = NULL;
+	GVariant *sartist = NULL;
+	GVariantIter *iter = NULL;
+	char *artist = calloc ( 512, 1 );
+	char *art = NULL;
 	if ( var ) {
 		title = g_variant_lookup_value ( var, "xesam:title", NULL );
 		album = g_variant_lookup_value ( var, "xesam:album", NULL );
+		sartist = g_variant_lookup_value ( var, "xesam:artist", NULL );
+		g_variant_get ( sartist, "as", &iter );
+		while ( g_variant_iter_loop ( iter, "s", &art ) ) {
+			snprintf ( artist, 512,
+					"%s %s",
+					artist,
+					art
+				 );
+		}
+		g_variant_iter_free ( iter );
+		
 	}
 	gsize length;
 
 	if ( title && album ) {
-		gchar *message = g_strdup_printf ( "альбом: %s. песня: %s", g_variant_get_string ( album, &length ), g_variant_get_string ( title, &length ) );
+		gchar *message = g_strdup_printf ( "альбом: %s. исполнитель: %s. песня: %s", 
+				g_variant_get_string ( album, &length ), 
+				artist,
+				g_variant_get_string ( title, &length ) );
 		gchar *body = g_strdup_printf ( "%s%s\n", line_for_message, message );
 
 		write ( sockfd, body, strlen ( body ) );
@@ -259,7 +294,9 @@ void audacious_manage_track ( ) {
 
 	if ( album ) g_variant_unref ( album );
 	if ( title ) g_variant_unref ( title );
+	if ( sartist ) g_variant_unref ( sartist );
 	if ( var ) g_variant_unref ( var );
+	if ( artist ) free ( artist );
 
 	trigger_player_run = 1;
 }
@@ -618,6 +655,8 @@ static void g_startup ( GApplication *app, gpointer data ) {
 	if ( notify_frozen ) show_notify_frozen = G_NOTIFICATION_PRIORITY_URGENT;
 	else show_notify_frozen = G_NOTIFICATION_PRIORITY_HIGH;
 
+	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
+
 	notify = g_notification_new ( "twitch" );
 	g_notification_set_priority ( notify, show_notify_frozen );
 
@@ -639,7 +678,6 @@ static void g_startup ( GApplication *app, gpointer data ) {
 	}
 
 
-	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
 	g_main_loop_run ( loop );
 }
 
