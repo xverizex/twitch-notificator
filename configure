@@ -55,6 +55,8 @@ all:
 	${CC} ${FLAGS} ${SOURCES} ${LIB} ${SOMELIBS} -o ${PRG}
 install:
 	install ${PRG} ${prefix_default}/bin
+	install com.xverizex.twitch-notificator.desktop ${prefix_default}/share/applications/
+	install twitch-notificator.png ${prefix_default}/share/pixmaps/
 clean:
 	rm ${PRG} config.h makefile
 uninstall:

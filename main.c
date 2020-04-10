@@ -37,7 +37,7 @@
 
 
 const char *prog = "com.xverizex.twitch-notificator";
-gchar *g_id;
+const gchar *g_id;
 
 GNotification *notify;
 GApplication *global_app;
@@ -386,6 +386,7 @@ static void *handle ( void *data ) {
 					nick,
 					room
 				 );
+			printf ( "%s\n", body );
 			g_notification_set_body ( notify, body );
 			g_application_send_notification ( app, prog, notify );
 		} else 
@@ -659,7 +660,7 @@ static void g_startup ( GApplication *app, gpointer data ) {
 
 	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
 
-	notify = g_notification_new ( "twitch" );
+	notify = g_notification_new ( "twitch_bot" );
 	g_notification_set_priority ( notify, show_notify_frozen );
 
 #ifdef AUDIO_NOTIFICATIONS
@@ -694,7 +695,7 @@ int main ( int argc, char **argv ) {
 
 	buffers_init ( );
 
-	daemon ( 1, 1 );
+	//daemon ( 1, 1 );
 
 	int ret;
 
@@ -702,10 +703,8 @@ int main ( int argc, char **argv ) {
 	GApplication *app;
 	app = g_application_new ( prog, G_APPLICATION_FLAGS_NONE );
 	g_application_register ( app, NULL, NULL );
-	//const gchar *g_id = g_application_get_application_id ( app );
+	g_id = g_application_get_application_id ( app );
 	global_app = app;
 	g_signal_connect ( app, "activate", G_CALLBACK ( g_startup ), NULL );
-	ret = g_application_run ( app, argc, argv );
-	g_object_unref ( app );
-	return ret;
+	return g_application_run ( app, argc, argv );
 }
