@@ -41,6 +41,7 @@ const char *content =
 "new_message=\n"
 "new_follower=\n"
 "notify_frozen=\n"
+"volume=50\n"
 ;
 
 const char *str_token = "token=";
@@ -55,6 +56,7 @@ const char *str_iface = "interface=";
 const char *str_new_message = "new_message=";
 const char *str_new_follower = "new_follower=";
 const char *str_notify_frozen = "notify_frozen=";
+const char *str_volume = "volume=";
 
 extern char *opt_oauth;
 extern char *opt_channel;
@@ -69,6 +71,7 @@ extern unsigned short port_event;
 extern int notify_frozen;
 extern int audacious;
 extern int uid;
+extern double opt_volume;
 char *opt_audacious;
 char *opt_notify_frozen;
 
@@ -149,6 +152,20 @@ static void parse_uid ( const char *s ) {
 	}
 	uid = atoi ( id );
 }
+
+static void parse_volume ( const char *s ) {
+	const char *must_be = s;
+	s += strlen ( str_uid );
+	const char *id = s;
+	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++, s++ ) {
+		if ( *s >= '0' && *s <= '9' ) continue;
+		fprintf ( stderr, "It must be number %s\n", must_be );
+		exit ( EXIT_FAILURE );
+	}
+	int vol = atoi ( id );
+	opt_volume = (double) ( (double) vol / 100.0 );
+}
+
 static void parse_audacious ( const char *s ) {
 	s += strlen ( str_audacious );
 	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++ ) {
@@ -186,6 +203,7 @@ static void parse_file ( const char *file ) {
 		if ( !strncmp ( str_new_message, s, strlen ( str_new_message ) ) ) { parse_new_message ( s ); continue; }
 		if ( !strncmp ( str_new_follower, s, strlen ( str_new_follower ) ) ) { parse_new_follower ( s ); continue; }
 		if ( !strncmp ( str_notify_frozen, s, strlen ( str_notify_frozen ) ) ) { parse_notify_frozen ( s ); continue; }
+		if ( !strncmp ( str_volume, s, strlen ( str_volume ) ) ) { parse_volume ( s ); continue; }
 	}
 }
 

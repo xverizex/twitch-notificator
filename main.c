@@ -55,6 +55,7 @@ char *line_for_message;
 char *message;
 char *nick;
 char *room;
+double opt_volume;
 
 GDBusProxy *audacious_proxy;
 
@@ -642,6 +643,7 @@ void init_struct_play ( struct play_notification *pl, const char *opt_music ) {
 	g_signal_connect ( pl->demuxer, "pad-added", G_CALLBACK ( on_pad_added ), pl->decoder );
 
 	g_object_set ( G_OBJECT ( pl->source ), "location", opt_music, NULL );
+	g_object_set ( G_OBJECT ( pl->volume ), "volume", opt_volume, NULL );
 
 	pl->pos = 0;
 }

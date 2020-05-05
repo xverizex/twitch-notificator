@@ -55,6 +55,8 @@ all:
 	${CC} ${FLAGS} ${SOURCES} ${LIB} ${SOMELIBS} -o ${PRG}
 install:
 	install ${PRG} ${prefix_default}/bin
+	mkdir -p ${prefix_default}/share/applications/
+	mkdir -p ${prefix_default}/share/pixmaps/
 	cp com.xverizex.twitch-notificator.desktop ${prefix_default}/share/applications/
 	cp twitch-notificator.png ${prefix_default}/share/pixmaps/
 clean:
