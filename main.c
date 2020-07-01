@@ -335,9 +335,9 @@ static void check_body ( const char *s ) {
 	if ( !strncmp ( s, opt_help, strlen ( opt_help ) + 1 ) ) { print_help ( ); return; }
 
 	if ( trigger_player == 0 && trigger_player_run ) {
-		gchar *message = g_strdup_printf ( "%s%s\n", line_for_message, "Ни один плеер не включен." );
+		char message[512];
+		snprintf ( message, 512, "%s%s\n", line_for_message, "Ни один плеер не включен." );
 		write ( sockfd, message, strlen ( message ) );
-		g_free ( message );
 	}
 
 	trigger_player_run = 0;
