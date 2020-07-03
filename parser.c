@@ -155,13 +155,18 @@ static void parse_uid ( const char *s ) {
 
 static void parse_volume ( const char *s ) {
 	const char *must_be = s;
-	s += strlen ( str_uid );
-	const char *id = s;
+	s += strlen ( str_volume );
+	char *id = alloca ( 255 );
+	int cid = 0;
 	for ( int i = 0; *s != 0x0 && *s != '\n' && i < 255 && *s != -1; i++, s++ ) {
-		if ( *s >= '0' && *s <= '9' ) continue;
+		if ( *s >= '0' && *s <= '9' ) { 
+			id[cid++] = *s;
+			continue;
+		}
 		fprintf ( stderr, "It must be number %s\n", must_be );
 		exit ( EXIT_FAILURE );
 	}
+	id[cid] = 0;
 	int vol = atoi ( id );
 	opt_volume = (double) ( (double) vol / 100.0 );
 }
