@@ -40,7 +40,7 @@ const char *content =
 "interface=\n"
 "new_message=\n"
 "new_follower=\n"
-"notify_frozen=\n"
+"notify_frozen=false\n"
 "volume=50\n"
 ;
 
