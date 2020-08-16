@@ -1,38 +1,32 @@
 # twitch-notificator 0.7
-twitch уведомлятор. Выводит в область уведомления сообщения.
+This program is the bot of notifications. It has show messages from twitch chat in the desktop notifications. It has support audio notification from file sound.
 
-Наберите в чате @nickname help, чтобы посмотреть допустимые команды, nickname - ник стримера.
+Write a message is '@nickname help' for seeing available commands. Nickname is the name of a streamer.
 
-Зависимости:
+Depending:
 * glib-2.0
 * gio-2.0
 
-Дополнительные зависимости, если захотите использовать pubsub websocket. - пока не реализовано.
-* json-c
-* libssl
-
-Дополнительные зависимости, если захотите использовать звук в уведомлениях.
+Additional depending if want use sound.
 * gstreamer-1.0
 
-Чтобы установить, первым делом выполните ./configure, если хотите установить дополнительные опции, то выполните ./configure --help
+In beginning, execute `./configure`. If want to see the depending options, execute './configure --help'.
+* --enable-sounds. This option is to enable a sound notification.
 
-Например, если хотите использовать звуковые уведомления, то допишите вот так `--enable-sounds`, что получить как `./configure --enable-sounds`.
-
-По умолчанию таймер уведомления временный, если хотите чтобы уведомление не исчезало, установите опцию notify_frozen=true
+When the bot had installed, start it. The bot will create a file of configuration. The file of configuration will be stored in '/home/user/.twitch-bot/conf'.
 
 
-Получите токен с сайта https://twitchapps.com/tmi/ .Нужно заполнить файл /home/%nick/.twitch-bot/conf. Чтобы создать эти файлы запустите первый раз программу. Он создаст и каталоги и файлы. Далее заполните файл конфигурации.
-* token = токен вместе со словом oauth.
-* nickname = ваше имя пользователя 
-* channel = название вашего канала
-* audacious = если задано true, то можно управлять музыкальным плеером audacious, если false, то нельзя управлять.
-* interface = укажите название своей сетевой карты, на которой нужно отслеживать соединения. Если вы отключитесь от интернет, программа заметит это и отключит ненужные потоки. Если интернет возобновиться, то программа переподключиться.
-* new_messages = укажите путь к звуковому файлу mp3. Когда придёт новое сообщение в чате, этот файл запуститься.
-* notify_frozen = если true, то уведомление не исчезает. Если false, то уведомление держиться около 10 секунд.
-* volume - укажите значение от 0 до 100, чтобы установить уровень громкости
+* token = for option 'token' get token from site 'https://twitchapps.com/tmi/' and copy it with the word 'oauth:'.
+* nickname = your nickname of token.
+* channel = your channel name.
+* audacious = if set 'true', to can control the music player such as 'audacious'.
+* interface = set the network interface for tracking a connection.
+* new_messages = set path for a file mp3. When will enter a new message, it will play sound this the file.
+* notify_frozen = by default the timer of notifications is temporary. For notifications is frozen, set `notify_frozen=true`.
+* volume - set volume level from 0 to 100 in percent.
 
-Возможности по управлению плеером audacious или rhythmbox
-* next - включить следующий трек
-* prev - включить предыдущий трек
-* track - узнать альбом и песню, которая проигрывается в данный момент
+Control music player 'audacious.
+* next - turn on the next track.
+* prev - turn on the previous track.
+* track - to known what track playing.
 ![](http://s1.uploadpics.ru/images/Wylq3uVVHS.png)
