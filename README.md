@@ -30,3 +30,4 @@ Control music player 'audacious.
 * prev - turn on the previous track.
 * track - to known what track playing.
 ![](http://s1.uploadpics.ru/images/Wylq3uVVHS.png)
+![](http://s1.uploadpics.ru/images/ZJRqio4hM8.png)
