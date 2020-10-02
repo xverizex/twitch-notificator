@@ -235,11 +235,6 @@ void init_for_irc_net ( ) {
 			once_player = 1;
 		}
 
-		player_next = g_strdup_printf ( "@%s next", cfg.nickname );
-		player_prev = g_strdup_printf ( "@%s prev", cfg.nickname );
-		player_track = g_strdup_printf ( "@%s track", cfg.nickname );
-		opt_help = g_strdup_printf ( "@%s help", cfg.nickname );
-		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", cfg.channel );
 }
 
 static void buffers_init ( ) {
@@ -249,6 +244,11 @@ static void buffers_init ( ) {
 	nick = calloc ( 255, 1 );
 	room = calloc ( 255, 1 );
 	message = calloc ( 1024, 1 );
+	player_next = g_strdup_printf ( "@%s next", cfg.nickname );
+	player_prev = g_strdup_printf ( "@%s prev", cfg.nickname );
+	player_track = g_strdup_printf ( "@%s track", cfg.nickname );
+	opt_help = g_strdup_printf ( "@%s help", cfg.nickname );
+	line_for_message = g_strdup_printf ( "PRIVMSG #%s :", cfg.channel );
 }
 
 static void copy_to_nick ( char *n, char **s ) {
@@ -384,8 +384,8 @@ static void check_body ( const char *s ) {
 }
 
 int run_once;
-static gboolean send_message ( gpointer data ) {
-	g_notification_set_body ( notify, body );
+static gboolean send_message ( gpointer body ) {
+	g_notification_set_body ( notify, ( char * ) body );
 	g_application_send_notification ( ( GApplication * ) global_app, prog, notify );
 	return FALSE;
 }
@@ -449,6 +449,7 @@ static void *handle ( void *data ) {
 					"%s: %s",
 					nick,
 					message );
+			printf ( "%s\n", body );
 			g_idle_add ( send_message, body );
 #ifdef AUDIO_NOTIFICATIONS
 			g_idle_add ( sound_message, NULL );
