@@ -657,10 +657,9 @@ void init_sounds ( ) {
 #endif
 
 static void g_startup ( GApplication *app, gpointer data ) {
+	g_application_hold ( app );
 	if ( notify_frozen ) show_notify_frozen = G_NOTIFICATION_PRIORITY_URGENT;
 	else show_notify_frozen = G_NOTIFICATION_PRIORITY_HIGH;
-
-	GMainLoop *loop = g_main_loop_new ( NULL, FALSE );
 
 	notify = g_notification_new ( "twitch_bot" );
 	g_notification_set_priority ( notify, show_notify_frozen );
@@ -682,8 +681,6 @@ static void g_startup ( GApplication *app, gpointer data ) {
 
 	}
 
-
-	g_main_loop_run ( loop );
 }
 
 
