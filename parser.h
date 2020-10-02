@@ -17,4 +17,19 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  * -------------------------------------------------------------------/
  */
+#ifndef __PARSER__
+#define __PARSER__
+struct conf {
+	char token[255];
+	char nickname[255];
+	char channel[255];
+	char interface[255];
+	char new_message[255];
+	double volume;
+	unsigned int audacious;
+	unsigned int notify_frozen;
+	unsigned int check_net_device;
+};
 void parser_config_init ( );
+void config_write ( );
+#endif

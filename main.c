@@ -1,7 +1,7 @@
 /*
  * twitch-bot - бот показывает сообщения от twitch в области уведомления
  *
- * Copyright (C) 2019 Naidolinsky Dmitry <naidv88@gmail.com>
+ * Copyright (C) 2020 Naidolinsky Dmitry <naidv88@gmail.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,8 +25,7 @@
 #include <pthread.h>
 #include <string.h>
 #include <unistd.h>
-#include <glib-2.0/glib.h>
-#include <glib-2.0/gio/gio.h>
+#include <gtk/gtk.h>
 #include <signal.h>
 #include "config.h"
 #include "parser.h"
@@ -39,8 +38,10 @@
 const char *prog = "com.xverizex.twitch-notificator";
 const gchar *g_id;
 
+pthread_t thread_p_pubsub;
+
 GNotification *notify;
-GApplication *global_app;
+GtkApplication *global_app;
 
 int show_notify_frozen;
 int sockfd;
@@ -56,6 +57,50 @@ char *message;
 char *nick;
 char *room;
 double opt_volume;
+
+struct conf cfg;
+int volume;
+
+struct widgets {
+	GtkWidget *window_main;
+	GtkWidget *box_window_main;
+	GtkWidget *frame_current_login;
+	GtkWidget *box_current_login;
+	GtkWidget *label_current_login;
+	GtkWidget *entry_current_login;
+	GtkWidget *frame_current_channel;
+	GtkWidget *box_current_channel;
+	GtkWidget *label_current_channel;
+	GtkWidget *entry_current_channel;
+	GtkWidget *frame_current_token;
+	GtkWidget *box_current_token;
+	GtkWidget *label_current_token;
+	GtkWidget *button_link_current_token;
+	GtkWidget *entry_current_token;
+	GtkWidget *frame_current_new_message;
+	GtkWidget *box_current_new_message;
+	GtkWidget *label_current_new_message;
+	GtkWidget *button_current_new_message;
+	GtkWidget *entry_current_new_message;
+	GtkWidget *frame_sub_net_device;
+	GtkWidget *box_sub_net_device;
+	GtkWidget *label_sub_net_device;
+	GtkWidget *entry_sub_net_device;
+	GtkWidget *check_sub_net_device;
+	GtkWidget *frame_volume;
+	GtkWidget *box_volume;
+	GtkWidget *label_volume;
+	GtkWidget *scale_volume;
+	GtkWidget *box_control;
+	GtkWidget *button_connect;
+	GtkWidget *header_bar;
+	GtkWidget *window_oauth;
+	GtkWidget *web_view_oauth;
+
+	GtkWidget *STUBS;
+} w;
+
+const char *styles = "window#light { background-color: #ececec; } treeview#light { background-color: #ffffff; color: #000000; } treeview#light:selected  { background: #8c8c8c; color: #ffffff; } treeview#light header button { background: #ffffff; color: #000000; } entry#light { background-color: #ffffff; } label#light { color: #000000; } frame#light { border-radius: 8px; background-color: #dcdcdc; } textview#light.view text { background-color: #ffffff; } frame#light border { border-radius: 8px; } button#light.text-button { background: #ffffff; } notebook#light tab { background-color: #ececec; color: #ffffff; } window#dark { background-color: #3c3c3c; } treeview#dark { background-color: #4c4c4c; color: #ffffff; } treeview#dark:selected { background-color: #1c1c1c; color: #ffffff; } entry#dark { background-color: #5c5c5c; color: #ffffff; } label#dark { color: #ffffff; } frame#dark { border-radius: 8px; background-color: #8c8c8c; } textview#dark.view text { background-color: #5c5c5c; color: #ffffff } frame#dark border { border-radius: 8px; } button#dark.text-button { background: #8c8c8c; } treeview#dark header button { background: #7c7c7c; color: #ffffff; } label#light_info { font-size: 12px; } label#dark_info { font-size: 12px; } label#standard_info { font-size: 12px; } notebook#dark tab { background-color: #4c4c4c; color: #ffffff; }";
 
 GDBusProxy *audacious_proxy;
 
@@ -73,20 +118,7 @@ const char *commands =
 
 const char *opt_help;
 
-char *opt_oauth;
-char *opt_channel;
-char *opt_nickname;
-char *opt_client_id;
-char *opt_callback;
-char *opt_iface;
-char *opt_new_message;
-char *opt_new_follower;
-
-int n_client_id;
-unsigned short port_event;
 int audacious;
-int uid;
-int notify_frozen;
 
 gchar *player_next;
 gchar *player_prev;
@@ -99,6 +131,13 @@ gchar *body;
 
 guint id_audacious;
 GDBusConnection *con_audacious;
+
+static void set_theme_name ( const char *name ) {
+	struct widgets **p = ( struct widgets ** ) &w;
+	for ( int i = 0; p[i] != NULL; i++ ) {
+		gtk_widget_set_name ( ( GtkWidget * ) p[i], name );
+	}
+}
 
 void sig_handle ( int sig ) {
 	switch ( sig ) {
@@ -196,20 +235,20 @@ void init_for_irc_net ( ) {
 			once_player = 1;
 		}
 
-		nick = calloc ( 255, 1 );
-		room = calloc ( 255, 1 );
-		message = calloc ( 1024, 1 );
-		player_next = g_strdup_printf ( "@%s next", opt_nickname );
-		player_prev = g_strdup_printf ( "@%s prev", opt_nickname );
-		player_track = g_strdup_printf ( "@%s track", opt_nickname );
-		opt_help = g_strdup_printf ( "@%s help", opt_nickname );
-		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", opt_channel );
-		body = calloc ( 1024, 1 );
+		player_next = g_strdup_printf ( "@%s next", cfg.nickname );
+		player_prev = g_strdup_printf ( "@%s prev", cfg.nickname );
+		player_track = g_strdup_printf ( "@%s track", cfg.nickname );
+		opt_help = g_strdup_printf ( "@%s help", cfg.nickname );
+		line_for_message = g_strdup_printf ( "PRIVMSG #%s :", cfg.channel );
 }
 
 static void buffers_init ( ) {
 	rbuffer = calloc ( size, 1 );
 	sbuffer = calloc ( 1024, 1 );
+	body = calloc ( 1024, 1 );
+	nick = calloc ( 255, 1 );
+	room = calloc ( 255, 1 );
+	message = calloc ( 1024, 1 );
 }
 
 static void copy_to_nick ( char *n, char **s ) {
@@ -345,23 +384,21 @@ static void check_body ( const char *s ) {
 }
 
 int run_once;
-static gboolean send_message ( gpointer body ) {
-	g_notification_set_body ( notify, ( char * ) body );
-	g_application_send_notification ( global_app, prog, notify );
+static gboolean send_message ( gpointer data ) {
+	g_notification_set_body ( notify, body );
+	g_application_send_notification ( ( GApplication * ) global_app, prog, notify );
 	return FALSE;
 }
-static gboolean play_sound_new_message ( gpointer data ) {
-#ifdef AUDIO_NOTIFICATIONS
+static gboolean sound_message ( gpointer data ) {
 	gst_element_seek_simple ( play_message.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_message.pos );
 	gst_element_set_state ( play_message.pipeline, GST_STATE_PLAYING );
-#endif
 	return FALSE;
 }
 
 static void *handle ( void *data ) {
 	pid_handle_irc = getpid ( );
 
-	GApplication *app = global_app;
+	GtkApplication *app = global_app;
 
 	while ( 1 ) {
 		memset ( rbuffer, 0, size );
@@ -414,7 +451,7 @@ static void *handle ( void *data ) {
 					message );
 			g_idle_add ( send_message, body );
 #ifdef AUDIO_NOTIFICATIONS
-			g_idle_add ( play_sound_new_message, NULL );
+			g_idle_add ( sound_message, NULL );
 #endif
 			check_body ( message );
 		}
@@ -426,19 +463,19 @@ static void *handle ( void *data ) {
 }
 void join_to_channel ( ) {
 	memset ( sbuffer, 0, 1024 );
-	sprintf ( sbuffer, "PASS %s\n", opt_oauth );
+	sprintf ( sbuffer, "PASS %s\n", cfg.token );
 	int ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
 	if ( ret == -1 ) {
 		perror ( "write" );
 	}
 	memset ( sbuffer, 0, 1024 );
-	sprintf ( sbuffer, "NICK %s\n", opt_nickname );
+	sprintf ( sbuffer, "NICK %s\n", cfg.nickname );
 	ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
 	if ( ret == -1 ) {
 		perror ( "write" );
 	}
 	memset ( sbuffer, 0, 1024 );
-	sprintf ( sbuffer, "JOIN #%s\n", opt_channel );
+	sprintf ( sbuffer, "JOIN #%s\n", cfg.channel );
 	ret = write ( sockfd, sbuffer, strlen ( sbuffer ) );
 	if ( ret == -1 ) {
 		perror ( "write" );
@@ -469,17 +506,7 @@ static void connect_to ( const char *site, unsigned short port ) {
 }
 
 static void init_opts ( ) {
-	opt_oauth = calloc ( 255, 1 );
-	opt_channel = calloc ( 255, 1 );
-	opt_nickname = calloc ( 255, 1 );
-	opt_client_id = calloc ( 255, 1 );
-	opt_callback = calloc ( 255, 1 );
-	opt_iface = calloc ( 255, 1 );
-
 	body_help = calloc ( 4096, 1 );
-
-	opt_new_message = calloc ( 255, 1 );
-	opt_new_follower = calloc ( 255, 1 );
 }
 gchar *object_path_iface;
 
@@ -505,7 +532,7 @@ static void connect_for_net_device ( ) {
 	GVariant *var = g_dbus_proxy_call_sync (
 			proxy,
 			"GetDeviceByIpIface",
-			g_variant_new ( "(s)", opt_iface ),
+			g_variant_new ( "(s)", cfg.interface ),
 			G_DBUS_CALL_FLAGS_NONE,
 			-1,
 			NULL,
@@ -517,11 +544,11 @@ static void connect_for_net_device ( ) {
 		exit ( EXIT_FAILURE );
 	}
 	if ( !var ) {
-		fprintf ( stderr, "%s: такого сетевого интерфейса не существует.\n", opt_iface );
+		fprintf ( stderr, "%s: такого сетевого интерфейса не существует.\n", cfg.interface );
 		exit ( EXIT_FAILURE );
 	}
 
-	object_path_iface = calloc ( 255, 1 );
+	if ( !object_path_iface ) object_path_iface = calloc ( 255, 1 );
 	g_variant_get ( var, "(o)", &object_path_iface );
 }
 
@@ -539,14 +566,14 @@ static void connect_to_network ( ) {
 	pthread_create ( &main_handle, NULL, handle, global_app );
 	const char *body = "Соединение установлено";
 	g_notification_set_body ( notify, body );
-	g_application_send_notification ( global_app, prog, notify );
+	g_application_send_notification ( ( GApplication * ) global_app, prog, notify );
 }
 
 static void connection_close_all ( ) {
 	pthread_cancel ( main_handle );
 	const char *body = "Соединение разорвано";
 	g_notification_set_body ( notify, body );
-	g_application_send_notification ( global_app, prog, notify );
+	g_application_send_notification ( ( GApplication * ) global_app, prog, notify );
 }
 
 static void handle_net_state ( GDBusConnection *con,
@@ -624,71 +651,343 @@ void on_pad_added ( GstElement *element, GstPad *pad, gpointer data ) {
 	gst_object_unref ( sinkpad );
 }
 
-void init_struct_play ( struct play_notification *pl, const char *opt_music ) {
-	pl->pipeline = gst_pipeline_new ( "new_messages" );
-	pl->source = gst_element_factory_make ( "filesrc", NULL );
-	pl->demuxer = gst_element_factory_make ( "decodebin", NULL );
-	pl->decoder = gst_element_factory_make ( "audioconvert", NULL );
-	pl->volume = gst_element_factory_make ( "volume", NULL );
-	pl->conv = gst_element_factory_make ( "audioconvert", NULL );
-	pl->sink = gst_element_factory_make ( "autoaudiosink", NULL );
+struct play_notification *gpl;
 
-	if ( !pl->pipeline || !pl->source || !pl->demuxer || !pl->decoder || !pl->volume || !pl->conv || !pl->sink ) {
-		fprintf ( stderr, "failed to init plugins\n" );
-		exit ( EXIT_FAILURE );
+void init_struct_play ( struct play_notification *pl, const char *opt_music ) {
+	if ( !gpl ) {
+		gpl = pl;
+
+		pl->pipeline = gst_pipeline_new ( "new_messages" );
+		pl->source = gst_element_factory_make ( "filesrc", NULL );
+		pl->demuxer = gst_element_factory_make ( "decodebin", NULL );
+		pl->decoder = gst_element_factory_make ( "audioconvert", NULL );
+		pl->volume = gst_element_factory_make ( "volume", NULL );
+		pl->conv = gst_element_factory_make ( "audioconvert", NULL );
+		pl->sink = gst_element_factory_make ( "autoaudiosink", NULL );
+
+		if ( !pl->pipeline || !pl->source || !pl->demuxer || !pl->decoder || !pl->volume || !pl->conv || !pl->sink ) {
+			fprintf ( stderr, "failed to init plugins\n" );
+			exit ( EXIT_FAILURE );
+		}
+
+		gst_bin_add_many ( GST_BIN ( pl->pipeline ),
+				pl->source,
+				pl->demuxer,
+				pl->decoder,
+				pl->volume,
+				pl->conv,
+				pl->sink,
+				NULL
+				);
+		gst_element_link ( pl->source, pl->demuxer );
+		gst_element_link_many ( pl->decoder, pl->volume, pl->conv, pl->sink, NULL );
+		g_signal_connect ( pl->demuxer, "pad-added", G_CALLBACK ( on_pad_added ), pl->decoder );
 	}
 
-	gst_bin_add_many ( GST_BIN ( pl->pipeline ),
-			pl->source,
-			pl->demuxer,
-			pl->decoder,
-			pl->volume,
-			pl->conv,
-			pl->sink,
-			NULL
-			);
-	gst_element_link ( pl->source, pl->demuxer );
-	gst_element_link_many ( pl->decoder, pl->volume, pl->conv, pl->sink, NULL );
-	g_signal_connect ( pl->demuxer, "pad-added", G_CALLBACK ( on_pad_added ), pl->decoder );
-
-	g_object_set ( G_OBJECT ( pl->source ), "location", opt_music, NULL );
-	g_object_set ( G_OBJECT ( pl->volume ), "volume", opt_volume, NULL );
+	g_object_set ( G_OBJECT ( pl->source ), "location", cfg.new_message, NULL );
+	g_object_set ( G_OBJECT ( pl->volume ), "volume", cfg.volume, NULL );
 
 	pl->pos = 0;
 }
 void init_sounds ( ) {
 	gst_init ( 0, 0 );
 
-	init_struct_play ( &play_message, opt_new_message );
-	init_struct_play ( &play_follower, opt_new_follower );
+	init_struct_play ( &play_message, cfg.new_message );
+	//init_struct_play ( &play_follower, opt_new_follower );
 
 }
 #endif
 
-static void g_startup ( GApplication *app, gpointer data ) {
-	g_application_hold ( app );
-	if ( notify_frozen ) show_notify_frozen = G_NOTIFICATION_PRIORITY_URGENT;
-	else show_notify_frozen = G_NOTIFICATION_PRIORITY_HIGH;
+static void button_connect_clicked_cb ( GtkButton *button, gpointer data ) {
+	const char *oauth_token = gtk_entry_get_text ( ( GtkEntry * ) w.entry_current_token );
+	const char *login = gtk_entry_get_text ( ( GtkEntry * ) w.entry_current_login );
+	const char *channel = gtk_entry_get_text ( ( GtkEntry * ) w.entry_current_channel );
+	const char *new_message = gtk_entry_get_text ( ( GtkEntry * ) w.entry_current_new_message );
+	const char *sub_net_device = gtk_entry_get_text ( ( GtkEntry * ) w.entry_sub_net_device );
+	cfg.check_net_device = gtk_toggle_button_get_active ( ( GtkToggleButton * ) w.check_sub_net_device ) == TRUE ? 1 : 0;
+	cfg.volume = gtk_range_get_value ( ( GtkRange * ) w.scale_volume );
+	strncpy ( cfg.nickname, login, strlen ( login ) + 1 );
+	strncpy ( cfg.channel, channel, strlen ( channel ) + 1 );
+	strncpy ( cfg.token, oauth_token, strlen ( oauth_token ) + 1 );
+	strncpy ( cfg.new_message, new_message, strlen ( new_message ) + 1 );
+	strncpy ( cfg.interface, sub_net_device, strlen ( sub_net_device ) + 1 );
+	config_write ( );
 
-	notify = g_notification_new ( "twitch_bot" );
-	g_notification_set_priority ( notify, show_notify_frozen );
+	if ( cfg.check_net_device ) {
+		connect_for_net_device ( );
+		set_signal_subscribe_to_net_status ( );
+	}
 
-#ifdef AUDIO_NOTIFICATIONS
-	init_sounds ( );
-#endif
-	connect_for_net_device ( );
-	set_signal_subscribe_to_net_status ( );
+	//init_for_irc_net ( );
 
-	init_for_irc_net ( );
+	if ( strlen ( new_message ) ) { init_sounds ( ); volume = 1; }
 
+#if 1
 	if ( power_net == 100 ) {
 		connect_to ( "irc.chat.twitch.tv", 6667 );
 
 		join_to_channel ( );
 
-		pthread_create ( &main_handle, NULL, handle, app );
-
+		pthread_create ( &main_handle, NULL, handle, global_app );
 	}
+#endif
+}
+
+static void action_activate_select_light_theme ( GSimpleAction *simple, GVariant *parameter, gpointer data ) {
+	set_theme_name ( "light" );
+}
+static void action_activate_select_dark_theme ( GSimpleAction *simple, GVariant *parameter, gpointer data ) {
+	set_theme_name ( "dark" );
+}
+static void action_activate_select_quit ( GSimpleAction *simple, GVariant *parameter, gpointer data ) {
+	exit ( EXIT_SUCCESS );
+}
+
+static void create_actions ( ) {
+	const GActionEntry entries[] = {
+		{ "select_light_theme", action_activate_select_light_theme },
+		{ "select_dark_theme", action_activate_select_dark_theme },
+		{ "select_quit", action_activate_select_quit }
+	};
+
+	g_action_map_add_action_entries ( G_ACTION_MAP ( global_app ), entries, G_N_ELEMENTS ( entries ), NULL );
+}
+
+static void scale_volume_value_changed_cb ( GtkRange *range, gpointer data ) {
+	cfg.volume = gtk_range_get_value ( range );
+	if ( volume ) g_object_set ( G_OBJECT ( gpl->volume ), "volume", cfg.volume, NULL );
+	config_write ( );
+}
+
+static void check_net_device_toggled_cb ( GtkToggleButton *button, gpointer data ) {
+	cfg.check_net_device = gtk_toggle_button_get_active ( button ) == TRUE ? 1 : 0;
+	config_write ( );
+}
+
+static void g_startup ( GtkApplication *app, gpointer data ) {
+	w.window_main = gtk_application_window_new ( app );
+	gtk_window_set_default_size ( ( GtkWindow * ) w.window_main, 500, 600 );
+	w.box_window_main = gtk_box_new ( GTK_ORIENTATION_VERTICAL, 0 );
+
+	create_actions ( );
+
+	GMenu *menu_app = g_menu_new ( );
+	GMenu *menu_styles = g_menu_new ( );
+	g_menu_append ( menu_styles, "Светлая тема", "app.select_light_theme" );
+	g_menu_append ( menu_styles, "Тёмная тема", "app.select_dark_theme" );
+	g_menu_append_submenu ( menu_app, "Выбрать тему", ( GMenuModel * ) menu_styles );
+	g_menu_append ( menu_app, "Выход", "app.select_quit" );
+
+	gtk_application_set_app_menu ( app, ( GMenuModel * ) menu_app );
+
+	GtkStyleContext *context = gtk_style_context_new ( );
+        GdkScreen *screen = gtk_style_context_get_screen ( context );
+        GtkCssProvider *provider = gtk_css_provider_new ( );
+        gtk_css_provider_load_from_data ( provider, styles, strlen ( styles ), NULL );
+        gtk_style_context_add_provider_for_screen ( screen, ( GtkStyleProvider * ) provider, GTK_STYLE_PROVIDER_PRIORITY_USER );
+
+	/* создать блок инфо - текущий пользователь */
+	w.frame_current_login = g_object_new ( GTK_TYPE_FRAME, "shadow-type", GTK_SHADOW_NONE, NULL );
+	gtk_frame_set_shadow_type ( ( GtkFrame * ) w.frame_current_login, GTK_SHADOW_OUT );
+	w.box_current_login = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	w.label_current_login = gtk_label_new ( "login" );
+	w.entry_current_login = gtk_entry_new ( );
+	gtk_entry_set_alignment ( ( GtkEntry * ) w.entry_current_login, 1 );
+	gtk_entry_set_width_chars ( ( GtkEntry * ) w.entry_current_login, 20 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_current_login, w.label_current_login, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_current_login, w.entry_current_login, FALSE, FALSE, 0 );
+	gtk_widget_set_margin_top ( w.label_current_login, 10 );
+	gtk_widget_set_margin_bottom ( w.label_current_login, 10 );
+	gtk_widget_set_margin_start ( w.label_current_login, 10 );
+	gtk_widget_set_margin_end ( w.label_current_login, 10 );
+	gtk_widget_set_margin_top ( w.entry_current_login, 10 );
+	gtk_widget_set_margin_bottom ( w.entry_current_login, 10 );
+	gtk_widget_set_margin_start ( w.entry_current_login, 10 );
+	gtk_widget_set_margin_end ( w.entry_current_login, 10 );
+	gtk_widget_set_margin_top ( w.frame_current_login, 32 );
+	gtk_widget_set_margin_start ( w.frame_current_login, 32 );
+	gtk_widget_set_margin_end ( w.frame_current_login, 32 );
+	gtk_container_add ( ( GtkContainer * ) w.frame_current_login, w.box_current_login );
+
+	/* создать блок инфо - текущий канал */
+	w.frame_current_channel = g_object_new ( GTK_TYPE_FRAME, "shadow-type", GTK_SHADOW_NONE, NULL );
+	gtk_frame_set_shadow_type ( ( GtkFrame * ) w.frame_current_channel, GTK_SHADOW_OUT );
+	w.box_current_channel = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	w.label_current_channel = gtk_label_new ( "channel" );
+	w.entry_current_channel = gtk_entry_new ( );
+	gtk_entry_set_alignment ( ( GtkEntry * ) w.entry_current_channel, 1 );
+	gtk_entry_set_width_chars ( ( GtkEntry * ) w.entry_current_channel, 20 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_current_channel, w.label_current_channel, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_current_channel, w.entry_current_channel, FALSE, FALSE, 0 );
+	gtk_widget_set_margin_top ( w.label_current_channel, 10 );
+	gtk_widget_set_margin_bottom ( w.label_current_channel, 10 );
+	gtk_widget_set_margin_start ( w.label_current_channel, 10 );
+	gtk_widget_set_margin_end ( w.label_current_channel, 10 );
+	gtk_widget_set_margin_top ( w.entry_current_channel, 10 );
+	gtk_widget_set_margin_bottom ( w.entry_current_channel, 10 );
+	gtk_widget_set_margin_start ( w.entry_current_channel, 10 );
+	gtk_widget_set_margin_end ( w.entry_current_channel, 10 );
+	gtk_widget_set_margin_top ( w.frame_current_channel, 10 );
+	gtk_widget_set_margin_start ( w.frame_current_channel, 32 );
+	gtk_widget_set_margin_end ( w.frame_current_channel, 32 );
+	gtk_container_add ( ( GtkContainer * ) w.frame_current_channel, w.box_current_channel );
+
+	/* создать блок инфо - текущий токен */
+	w.frame_current_token = g_object_new ( GTK_TYPE_FRAME, "shadow-type", GTK_SHADOW_NONE, NULL );
+	gtk_frame_set_shadow_type ( ( GtkFrame * ) w.frame_current_token, GTK_SHADOW_OUT );
+	w.box_current_token = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	w.label_current_token = gtk_label_new ( "token" );
+	w.entry_current_token = gtk_entry_new ( );
+	gtk_entry_set_alignment ( ( GtkEntry * ) w.entry_current_token, 1 );
+	gtk_entry_set_width_chars ( ( GtkEntry * ) w.entry_current_token, 20 );
+	gtk_entry_set_invisible_char ( ( GtkEntry * ) w.entry_current_token, '*' );
+	gtk_entry_set_visibility ( ( GtkEntry * ) w.entry_current_token, FALSE );
+	w.button_link_current_token = gtk_link_button_new_with_label ( "https://twitchapps.com/tmi/", "get token" );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_current_token, w.label_current_token, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_current_token, w.entry_current_token, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_current_token, w.button_link_current_token, FALSE, FALSE, 0 );
+	gtk_widget_set_margin_top ( w.label_current_token, 10 );
+	gtk_widget_set_margin_bottom ( w.label_current_token, 10 );
+	gtk_widget_set_margin_start ( w.label_current_token, 10 );
+	gtk_widget_set_margin_end ( w.label_current_token, 10 );
+	gtk_widget_set_margin_top ( w.button_link_current_token, 10 );
+	gtk_widget_set_margin_bottom ( w.button_link_current_token, 10 );
+	gtk_widget_set_margin_end ( w.button_link_current_token, 10 );
+	gtk_widget_set_margin_top ( w.entry_current_token, 10 );
+	gtk_widget_set_margin_bottom ( w.entry_current_token, 10 );
+	gtk_widget_set_margin_start ( w.entry_current_token, 10 );
+	gtk_widget_set_margin_end ( w.entry_current_token, 10 );
+	gtk_widget_set_margin_top ( w.frame_current_token, 10 );
+	gtk_widget_set_margin_start ( w.frame_current_token, 32 );
+	gtk_widget_set_margin_end ( w.frame_current_token, 32 );
+	gtk_container_add ( ( GtkContainer * ) w.frame_current_token, w.box_current_token );
+	
+	/* создать блок - текущий звук при новом входящем сообщении */
+	w.frame_current_new_message = g_object_new ( GTK_TYPE_FRAME, "shadow-type", GTK_SHADOW_NONE, NULL );
+	gtk_frame_set_shadow_type ( ( GtkFrame * ) w.frame_current_new_message, GTK_SHADOW_OUT );
+	w.box_current_new_message = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	w.button_current_new_message = gtk_button_new_with_label ( "add" );
+	w.label_current_new_message = gtk_label_new ( "sound of new message" );
+	w.entry_current_new_message = gtk_entry_new ( );
+	gtk_entry_set_alignment ( ( GtkEntry * ) w.entry_current_new_message, 1 );
+	gtk_entry_set_width_chars ( ( GtkEntry * ) w.entry_current_new_message, 20 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_current_new_message, w.label_current_new_message, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_current_new_message, w.entry_current_new_message, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_current_new_message, w.button_current_new_message, FALSE, FALSE, 0 );
+	gtk_widget_set_margin_top ( w.label_current_new_message, 10 );
+	gtk_widget_set_margin_bottom ( w.label_current_new_message, 10 );
+	gtk_widget_set_margin_start ( w.label_current_new_message, 10 );
+	gtk_widget_set_margin_end ( w.label_current_new_message, 10 );
+	gtk_widget_set_margin_top ( w.button_current_new_message, 10 );
+	gtk_widget_set_margin_bottom ( w.button_current_new_message, 10 );
+	gtk_widget_set_margin_start ( w.button_current_new_message, 10 );
+	gtk_widget_set_margin_end ( w.button_current_new_message, 10 );
+	gtk_widget_set_margin_top ( w.entry_current_new_message, 10 );
+	gtk_widget_set_margin_bottom ( w.entry_current_new_message, 10 );
+	gtk_widget_set_margin_start ( w.entry_current_new_message, 10 );
+	gtk_widget_set_margin_end ( w.entry_current_new_message, 10 );
+	gtk_widget_set_margin_top ( w.frame_current_new_message, 10 );
+	gtk_widget_set_margin_start ( w.frame_current_new_message, 32 );
+	gtk_widget_set_margin_end ( w.frame_current_new_message, 32 );
+	gtk_container_add ( ( GtkContainer * ) w.frame_current_new_message, w.box_current_new_message );
+
+	/* создать блок - подписка на сетевое устройство */
+	w.frame_sub_net_device = g_object_new ( GTK_TYPE_FRAME, "shadow-type", GTK_SHADOW_NONE, NULL );
+	gtk_frame_set_shadow_type ( ( GtkFrame * ) w.frame_sub_net_device, GTK_SHADOW_OUT );
+	w.box_sub_net_device = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	w.entry_sub_net_device = gtk_entry_new ( );
+	gtk_entry_set_alignment ( ( GtkEntry * ) w.entry_sub_net_device, 1 );
+	gtk_entry_set_width_chars ( ( GtkEntry * ) w.entry_sub_net_device, 20 );
+	w.label_sub_net_device = gtk_label_new ( "subscribe on net device" );
+	w.check_sub_net_device = gtk_check_button_new ( );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_sub_net_device, w.label_sub_net_device, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_sub_net_device, w.entry_sub_net_device, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_sub_net_device, w.check_sub_net_device, FALSE, FALSE, 0 );
+	gtk_widget_set_margin_top ( w.label_sub_net_device, 10 );
+	gtk_widget_set_margin_bottom ( w.label_sub_net_device, 10 );
+	gtk_widget_set_margin_start ( w.label_sub_net_device, 10 );
+	gtk_widget_set_margin_end ( w.label_sub_net_device, 10 );
+	gtk_widget_set_margin_top ( w.check_sub_net_device, 10 );
+	gtk_widget_set_margin_bottom ( w.check_sub_net_device, 10 );
+	gtk_widget_set_margin_start ( w.check_sub_net_device, 10 );
+	gtk_widget_set_margin_end ( w.check_sub_net_device, 10 );
+	gtk_widget_set_margin_top ( w.entry_sub_net_device, 10 );
+	gtk_widget_set_margin_bottom ( w.entry_sub_net_device, 10 );
+	gtk_widget_set_margin_start ( w.entry_sub_net_device, 10 );
+	gtk_widget_set_margin_end ( w.entry_sub_net_device, 10 );
+	gtk_widget_set_margin_top ( w.frame_sub_net_device, 10 );
+	gtk_widget_set_margin_start ( w.frame_sub_net_device, 32 );
+	gtk_widget_set_margin_end ( w.frame_sub_net_device, 32 );
+	gtk_container_add ( ( GtkContainer * ) w.frame_sub_net_device, w.box_sub_net_device );
+
+	/* создать блок - уровень звука */
+	w.frame_volume = g_object_new ( GTK_TYPE_FRAME, "shadow-type", GTK_SHADOW_NONE, NULL );
+	gtk_frame_set_shadow_type ( ( GtkFrame * ) w.frame_volume, GTK_SHADOW_OUT );
+	w.box_volume = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	w.label_volume = gtk_label_new ( "volume of sound new message" );
+	GtkAdjustment *adj = gtk_adjustment_new ( 0.0, 0.0, 1.0, 1.0, 1.0, 0.0 );
+	w.scale_volume = gtk_scale_new ( GTK_ORIENTATION_HORIZONTAL, adj );
+	gtk_scale_set_draw_value ( ( GtkScale * ) w.scale_volume, FALSE );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_volume, w.label_volume, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_volume, w.scale_volume, TRUE, TRUE, 0 );
+	gtk_widget_set_margin_top ( w.label_volume, 10 );
+	gtk_widget_set_margin_bottom ( w.label_volume, 10 );
+	gtk_widget_set_margin_start ( w.label_volume, 10 );
+	gtk_widget_set_margin_end ( w.label_volume, 10 );
+	gtk_widget_set_margin_top ( w.scale_volume, 10 );
+	gtk_widget_set_margin_bottom ( w.scale_volume, 10 );
+	gtk_widget_set_margin_start ( w.scale_volume, 10 );
+	gtk_widget_set_margin_end ( w.scale_volume, 10 );
+	gtk_widget_set_margin_top ( w.frame_volume, 10 );
+	gtk_widget_set_margin_start ( w.frame_volume, 32 );
+	gtk_widget_set_margin_end ( w.frame_volume, 32 );
+	gtk_container_add ( ( GtkContainer * ) w.frame_volume, w.box_volume );
+
+	/* создать блок кнопок */
+	w.box_control = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	w.button_connect = gtk_button_new_with_label ( "ПОДКЛЮЧИТЬСЯ" );
+	gtk_widget_set_margin_top ( w.button_connect, 10 );
+	gtk_widget_set_margin_start ( w.button_connect, 10 );
+	gtk_widget_set_margin_end ( w.button_connect, 10 );
+	gtk_widget_set_margin_bottom ( w.button_connect, 10 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_control, w.button_connect, FALSE, FALSE, 0 );
+
+	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_current_login, FALSE, FALSE, 0 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_current_channel, FALSE, FALSE, 0 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_current_token, FALSE, FALSE, 0 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_current_new_message, FALSE, FALSE, 0 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_sub_net_device, FALSE, FALSE, 0 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_volume, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_window_main, w.box_control, FALSE, FALSE, 0 );
+
+	w.header_bar = gtk_header_bar_new ( );
+	gtk_header_bar_set_title ( ( GtkHeaderBar * ) w.header_bar, "twitch bot" );
+	gtk_header_bar_set_show_close_button ( ( GtkHeaderBar * ) w.header_bar, TRUE );
+	gtk_header_bar_set_decoration_layout ( ( GtkHeaderBar * ) w.header_bar, ":menu,minimize,close" );
+	gtk_window_set_titlebar ( ( GtkWindow * ) w.window_main, w.header_bar );
+
+	gtk_container_add ( ( GtkContainer * ) w.window_main, w.box_window_main );
+	set_theme_name ( "light" );
+
+	gtk_entry_set_text ( ( GtkEntry * ) w.entry_current_login, cfg.nickname );
+	gtk_entry_set_text ( ( GtkEntry * ) w.entry_current_channel, cfg.channel );
+	gtk_entry_set_text ( ( GtkEntry * ) w.entry_current_token, cfg.token );
+	gtk_entry_set_text ( ( GtkEntry * ) w.entry_current_new_message, cfg.new_message );
+	gtk_entry_set_text ( ( GtkEntry * ) w.entry_sub_net_device, cfg.interface );
+	gtk_range_set_value ( ( GtkRange * ) w.scale_volume, cfg.volume );
+
+	if ( cfg.check_net_device ) {
+		gtk_toggle_button_set_active ( ( GtkToggleButton * ) w.check_sub_net_device, TRUE );
+	}
+
+	gtk_widget_show_all ( w.window_main );
+
+	g_signal_connect ( w.button_connect, "clicked", G_CALLBACK ( button_connect_clicked_cb ), NULL );
+	g_signal_connect ( w.scale_volume, "value-changed", G_CALLBACK ( scale_volume_value_changed_cb ), NULL );
+	g_signal_connect ( w.check_sub_net_device, "toggled", G_CALLBACK ( check_net_device_toggled_cb ), NULL );
+
+	notify = g_notification_new ( "twitch_bot" );
+	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
 
 }
 
@@ -699,20 +998,12 @@ int main ( int argc, char **argv ) {
 
 	signal ( SIGINT, sig_handle );
 
-
-
 	buffers_init ( );
 
-	//daemon ( 1, 1 );
-
-	int ret;
-
-
-	GApplication *app;
-	app = g_application_new ( prog, G_APPLICATION_FLAGS_NONE );
-	g_application_register ( app, NULL, NULL );
-	g_id = g_application_get_application_id ( app );
+	GtkApplication *app;
+	app = gtk_application_new ( prog, G_APPLICATION_FLAGS_NONE );
+	g_application_register ( ( GApplication * ) app, NULL, NULL );
 	global_app = app;
 	g_signal_connect ( app, "activate", G_CALLBACK ( g_startup ), NULL );
-	return g_application_run ( app, argc, argv );
+	return g_application_run ( ( GApplication * ) app, argc, argv );
 }

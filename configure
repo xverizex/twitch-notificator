@@ -30,20 +30,12 @@ for opt do
 		*) show_help;;
 	esac
 done
-SOUNDS_LIBS=
-SOUNDS_CFLAGS=
-
-if [ $sounds -eq 1 ]
-then
-	SOUNDS_LIBS=',gstreamer-1.0'
-	SOUNDS_CFLAGS=',gstreamer-1.0'
-	echo "#define AUDIO_NOTIFICATIONS    1" >> config.h
-fi
 
 SOURCES='main.c parser.c'
 
-STANDARD_LIBS='glib-2.0,gio-2.0'
-STANDARD_CFLAGS='glib-2.0,gio-2.0'
+echo "#define AUDIO_NOTIFICATIONS    1" >> config.h
+STANDARD_LIBS='gtk+-3.0,gstreamer-1.0,libssl'
+STANDARD_CFLAGS='gtk+-3.0,gstreamer-1.0,libssl'
 LIB=`pkg-config --libs ${STANDARD_LIBS}${SOUNDS_LIBS} --cflags ${STANDARD_LIBS}${SOUNDS_CFLAGS}`
 FLAGS=''
 SOMELIBS='-pthread'
