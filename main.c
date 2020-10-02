@@ -345,6 +345,18 @@ static void check_body ( const char *s ) {
 }
 
 int run_once;
+static gboolean send_message ( gpointer body ) {
+	g_notification_set_body ( notify, ( char * ) body );
+	g_application_send_notification ( global_app, prog, notify );
+	return FALSE;
+}
+static gboolean play_sound_new_message ( gpointer data ) {
+#ifdef AUDIO_NOTIFICATIONS
+	gst_element_seek_simple ( play_message.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_message.pos );
+	gst_element_set_state ( play_message.pipeline, GST_STATE_PLAYING );
+#endif
+	return FALSE;
+}
 
 static void *handle ( void *data ) {
 	pid_handle_irc = getpid ( );
@@ -388,8 +400,7 @@ static void *handle ( void *data ) {
 					room
 				 );
 			printf ( "%s\n", body );
-			g_notification_set_body ( notify, body );
-			g_application_send_notification ( app, prog, notify );
+			g_idle_add ( send_message, body );
 		} else 
 		if ( !strncmp ( s, msg, length_msg ) ) {
 			s += length_msg + 1;
@@ -401,11 +412,9 @@ static void *handle ( void *data ) {
 					"%s: %s",
 					nick,
 					message );
-			g_notification_set_body ( notify, body );
-			g_application_send_notification ( app, prog, notify );
+			g_idle_add ( send_message, body );
 #ifdef AUDIO_NOTIFICATIONS
-			gst_element_seek_simple ( play_message.pipeline, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH, play_message.pos );
-			gst_element_set_state ( play_message.pipeline, GST_STATE_PLAYING );
+			g_idle_add ( play_sound_new_message, NULL );
 #endif
 			check_body ( message );
 		}
