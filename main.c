@@ -386,7 +386,7 @@ static void check_body ( const char *s ) {
 int run_once;
 static gboolean send_message ( gpointer body ) {
 	g_notification_set_body ( notify, ( char * ) body );
-	g_application_send_notification ( ( GApplication * ) global_app, prog, notify );
+	g_application_send_notification ( ( GApplication * ) global_app, NULL, notify );
 	return FALSE;
 }
 static gboolean sound_message ( gpointer data ) {
