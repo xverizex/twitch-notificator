@@ -7,15 +7,11 @@ Depending:
 * glib-2.0
 * gio-2.0
 * appindicator3
-
-Additional depending if want use sound.
 * gstreamer-1.0
 
-In beginning, execute `./configure`. If want to see the depending options, execute './configure --help'.
-* --enable-sounds. This option is to enable a sound notification.
+In beginning, execute `./configure`.
 
 When the bot had installed, start it. The bot will create a file of configuration. The file of configuration will be stored in '/home/user/.twitch-bot/conf'.
-
 
 * token = for option 'token' get token from site 'https://twitchapps.com/tmi/' and copy it with the word 'oauth:'.
 * nickname = your nickname of token.
@@ -31,5 +27,6 @@ Control music player 'audacious.
 * prev - turn on the previous track.
 * track - to known what track playing.
 * start - seek to start position track.
+
 ![](http://s1.uploadpics.ru/images/bJg51xc7BL.png)
 ![](http://s1.uploadpics.ru/images/WJGoJlcXrI.png)
