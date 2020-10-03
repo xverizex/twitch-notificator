@@ -815,6 +815,7 @@ static void check_check_audacious_toggled_cb ( GtkToggleButton *button, gpointer
 
 static void item_show_window_activate_cb ( GtkMenuItem *item, gpointer data ) {
 	gtk_widget_show_all ( w.window_main );
+	gtk_window_present ( ( GtkWindow * ) w.window_main );
 }
 
 static void item_exit_program_activate_cb ( GtkMenuItem *item, gpointer data ) {
