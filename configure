@@ -34,8 +34,8 @@ done
 SOURCES='main.c parser.c'
 
 echo "#define AUDIO_NOTIFICATIONS    1" >> config.h
-STANDARD_LIBS='gtk+-3.0,gstreamer-1.0,libssl'
-STANDARD_CFLAGS='gtk+-3.0,gstreamer-1.0,libssl'
+STANDARD_LIBS='gtk+-3.0,gstreamer-1.0,libssl,appindicator3-0.1'
+STANDARD_CFLAGS='gtk+-3.0,gstreamer-1.0,libssl,appindicator3-0.1'
 LIB=`pkg-config --libs ${STANDARD_LIBS}${SOUNDS_LIBS} --cflags ${STANDARD_LIBS}${SOUNDS_CFLAGS}`
 FLAGS=''
 SOMELIBS='-pthread'

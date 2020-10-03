@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <gtk/gtk.h>
 #include <signal.h>
+#include <libappindicator/app-indicator.h>
 #include "config.h"
 #include "parser.h"
 #ifdef AUDIO_NOTIFICATIONS
@@ -60,6 +61,8 @@ double opt_volume;
 
 struct conf cfg;
 int volume;
+
+AppIndicator *indicator;
 
 struct widgets {
 	GtkWidget *window_main;
@@ -691,13 +694,38 @@ void init_struct_play ( struct play_notification *pl, const char *opt_music ) {
 	pl->pos = 0;
 }
 void init_sounds ( ) {
-	gst_init ( 0, 0 );
 
 	init_struct_play ( &play_message, cfg.new_message );
 	//init_struct_play ( &play_follower, opt_new_follower );
 
 }
 #endif
+
+static void button_current_new_message_clicked_cb ( GtkButton *button, gpointer data ) {
+	GtkWidget *dialog;
+	GtkFileChooserAction action = GTK_FILE_CHOOSER_ACTION_OPEN;
+	int res;
+
+	dialog = gtk_file_chooser_dialog_new ( "Open sound file",
+			( GtkWindow * ) w.window_main,
+			action,
+			"Cancel",
+			GTK_RESPONSE_CANCEL,
+			"Open",
+			GTK_RESPONSE_ACCEPT,
+			NULL );
+
+	res = gtk_dialog_run ( ( GtkDialog * ) dialog );
+	if ( res == GTK_RESPONSE_ACCEPT ) {
+		char *filename;
+		GtkFileChooser *chooser = GTK_FILE_CHOOSER ( dialog );
+		filename = gtk_file_chooser_get_filename ( chooser );
+		gtk_entry_set_text ( ( GtkEntry * ) w.entry_current_new_message, filename );
+		g_free ( filename );
+	}
+
+	gtk_widget_destroy ( dialog );
+}
 
 static void button_connect_clicked_cb ( GtkButton *button, gpointer data ) {
 	const char *oauth_token = gtk_entry_get_text ( ( GtkEntry * ) w.entry_current_token );
@@ -765,6 +793,19 @@ static void check_net_device_toggled_cb ( GtkToggleButton *button, gpointer data
 	config_write ( );
 }
 
+static void item_show_window_activate_cb ( GtkMenuItem *item, gpointer data ) {
+	gtk_widget_show_all ( w.window_main );
+}
+
+static void item_exit_program_activate_cb ( GtkMenuItem *item, gpointer data ) {
+	exit ( EXIT_SUCCESS );
+}
+
+static gboolean window_main_delete_event_cb ( GtkWidget *widget, GdkEvent *event, gpointer data ) {
+	gtk_widget_hide ( w.window_main );
+	return TRUE;
+}
+
 static void g_startup ( GtkApplication *app, gpointer data ) {
 	w.window_main = gtk_application_window_new ( app );
 	gtk_window_set_default_size ( ( GtkWindow * ) w.window_main, 500, 600 );
@@ -780,6 +821,18 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 	g_menu_append ( menu_app, "Выход", "app.select_quit" );
 
 	gtk_application_set_app_menu ( app, ( GMenuModel * ) menu_app );
+
+	indicator = app_indicator_new ( prog, "twitch-notificator", APP_INDICATOR_CATEGORY_COMMUNICATIONS );
+	GtkWidget *indicator_menu = gtk_menu_new ( );
+	GtkWidget *item_show_window = gtk_menu_item_new_with_label ( "Show window" );
+	GtkWidget *item_exit_program = gtk_menu_item_new_with_label ( "Exit" );
+	g_signal_connect ( item_show_window, "activate", G_CALLBACK ( item_show_window_activate_cb ), NULL );
+	g_signal_connect ( item_exit_program, "activate", G_CALLBACK ( item_exit_program_activate_cb ), NULL );
+	gtk_menu_shell_append ( ( GtkMenuShell * ) indicator_menu, item_show_window );
+	gtk_menu_shell_append ( ( GtkMenuShell * ) indicator_menu, item_exit_program );
+	app_indicator_set_menu ( indicator, ( GtkMenu * ) indicator_menu );
+	app_indicator_set_status ( indicator, APP_INDICATOR_STATUS_ACTIVE );
+	gtk_widget_show_all ( indicator_menu );
 
 	GtkStyleContext *context = gtk_style_context_new ( );
         GdkScreen *screen = gtk_style_context_get_screen ( context );
@@ -986,6 +1039,8 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 	g_signal_connect ( w.button_connect, "clicked", G_CALLBACK ( button_connect_clicked_cb ), NULL );
 	g_signal_connect ( w.scale_volume, "value-changed", G_CALLBACK ( scale_volume_value_changed_cb ), NULL );
 	g_signal_connect ( w.check_sub_net_device, "toggled", G_CALLBACK ( check_net_device_toggled_cb ), NULL );
+	g_signal_connect ( w.button_current_new_message, "clicked", G_CALLBACK ( button_current_new_message_clicked_cb ), NULL );
+	g_signal_connect ( w.window_main, "delete-event", G_CALLBACK ( window_main_delete_event_cb ), NULL );
 
 	notify = g_notification_new ( "twitch_bot" );
 	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
@@ -996,6 +1051,7 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 int main ( int argc, char **argv ) {
 	init_opts ( );
 	parser_config_init ( );
+	gst_init ( 0, 0 );
 
 	signal ( SIGINT, sig_handle );
 

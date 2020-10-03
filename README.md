@@ -1,4 +1,4 @@
-# twitch-notificator 1.0
+# twitch-notificator 1.1
 This program is the bot of notifications. It has show messages from twitch chat in the desktop notifications. It has support audio notification from file sound.
 
 Write a message is '@nickname help' for seeing available commands. Nickname is the name of a streamer.
@@ -6,6 +6,7 @@ Write a message is '@nickname help' for seeing available commands. Nickname is t
 Depending:
 * glib-2.0
 * gio-2.0
+* appindicator3
 
 Additional depending if want use sound.
 * gstreamer-1.0
