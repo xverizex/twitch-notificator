@@ -13,15 +13,6 @@ In beginning, execute `./configure`.
 
 When the bot had installed, start it. The bot will create a file of configuration. The file of configuration will be stored in '/home/user/.twitch-bot/conf'.
 
-* token = for option 'token' get token from site 'https://twitchapps.com/tmi/' and copy it with the word 'oauth:'.
-* nickname = your nickname of token.
-* channel = your channel name.
-* audacious = if set 'true', to can control the music player such as 'audacious'.
-* interface = set the network interface for tracking a connection.
-* new_messages = set path for a file mp3. When will enter a new message, it will play sound this the file.
-* notify_frozen = by default the timer of notifications is temporary. For notifications is frozen, set `notify_frozen=true`.
-* volume - set volume level from 0 to 100 in percent.
-
 Control music player 'audacious.
 * next - turn on the next track.
 * prev - turn on the previous track.
