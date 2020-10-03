@@ -94,11 +94,14 @@ struct widgets {
 	GtkWidget *box_volume;
 	GtkWidget *label_volume;
 	GtkWidget *scale_volume;
+	GtkWidget *frame_check_audacious;
+	GtkWidget *box_check_audacious;
+	GtkWidget *label_check_audacious;
+	GtkWidget *check_check_audacious;
 	GtkWidget *box_control;
 	GtkWidget *button_connect;
 	GtkWidget *header_bar;
-	GtkWidget *window_oauth;
-	GtkWidget *web_view_oauth;
+
 
 	GtkWidget *STUBS;
 } w;
@@ -115,6 +118,7 @@ struct play_notification play_message, play_follower;
 const char *commands =
 "next - ( audacious ) перключение песни вперед. "
 "prev - ( audacious ) переключение песни назад. "
+"start - ( audacious ) переключение на начало песни. "
 "track - ( audacious ) показывает информацию о текущей песне. "
 "help - эта справка"
 ;
@@ -126,6 +130,7 @@ int audacious;
 gchar *player_next;
 gchar *player_prev;
 gchar *player_track;
+gchar *player_start;
 
 pid_t pid_handle_irc;
 pid_t pid_server_webhook;
@@ -206,37 +211,33 @@ static void handle_player_state ( GDBusConnection *con,
 #endif
 }
 void init_for_irc_net ( ) {
-		if ( audacious == 1 ) {
-			audacious_proxy = g_dbus_proxy_new_for_bus_sync (
-					G_BUS_TYPE_SESSION,
-					G_DBUS_PROXY_FLAGS_NONE,
-					NULL,
-					"org.atheme.audacious",
-					"/org/mpris/MediaPlayer2",
-					"org.mpris.MediaPlayer2.Player",
-					NULL,
-					NULL
-					);
-		}
-
-		int once_player = 0;
-
-		if ( audacious == 1 ) {
-			con_audacious = g_dbus_proxy_get_connection ( audacious_proxy );
-			id_audacious = g_dbus_connection_signal_subscribe ( 
-				con_audacious,
-				"org.atheme.audacious",
-				"org.mpris.MediaPlayer2.Player",
-				"Seeked",
-				"/org/mpris/MediaPlayer2",
+		audacious_proxy = g_dbus_proxy_new_for_bus_sync (
+				G_BUS_TYPE_SESSION,
+				G_DBUS_PROXY_FLAGS_NONE,
 				NULL,
-				G_DBUS_SIGNAL_FLAGS_NONE,
-				handle_player_state,
+				"org.atheme.audacious",
+				"/org/mpris/MediaPlayer2",
+				"org.mpris.MediaPlayer2.Player",
 				NULL,
 				NULL
 				);
-			once_player = 1;
-		}
+
+		int once_player = 0;
+
+		con_audacious = g_dbus_proxy_get_connection ( audacious_proxy );
+		id_audacious = g_dbus_connection_signal_subscribe ( 
+			con_audacious,
+			"org.atheme.audacious",
+			"org.mpris.MediaPlayer2.Player",
+			"Seeked",
+			"/org/mpris/MediaPlayer2",
+			NULL,
+			G_DBUS_SIGNAL_FLAGS_NONE,
+			handle_player_state,
+			NULL,
+			NULL
+			);
+		once_player = 1;
 
 }
 
@@ -250,6 +251,7 @@ static void buffers_init ( ) {
 	player_next = g_strdup_printf ( "@%s next", cfg.nickname );
 	player_prev = g_strdup_printf ( "@%s prev", cfg.nickname );
 	player_track = g_strdup_printf ( "@%s track", cfg.nickname );
+	player_start = g_strdup_printf ( "@%s start", cfg.nickname );
 	opt_help = g_strdup_printf ( "@%s help", cfg.nickname );
 	line_for_message = g_strdup_printf ( "PRIVMSG #%s :", cfg.channel );
 }
@@ -288,6 +290,16 @@ void audacious_manage_prev ( ) {
 	g_dbus_proxy_call_sync ( audacious_proxy,
 			"Previous",
 			NULL,
+			G_DBUS_CALL_FLAGS_NONE,
+			-1,
+			NULL,
+			NULL
+			);
+}
+void audacious_manage_start ( ) {
+	g_dbus_proxy_call_sync ( audacious_proxy,
+			"Seek",
+			g_variant_new ( "(x)", -99999999999 ),
 			G_DBUS_CALL_FLAGS_NONE,
 			-1,
 			NULL,
@@ -357,7 +369,7 @@ void print_help ( ) {
 
 static void check_body ( const char *s ) {
 	do {
-		if ( audacious ) {
+		if ( cfg.check_audacious ) {
 			if ( !strncmp ( s, player_next, strlen ( player_next ) + 1 ) ) { 
 				audacious_manage_next ( ); 
 				break;
@@ -368,6 +380,10 @@ static void check_body ( const char *s ) {
 			}
 			if ( !strncmp ( s, player_track, strlen ( player_track ) + 1 ) ) { 
 				audacious_manage_track ( ); 
+				break;
+			}
+			if ( !strncmp ( s, player_start, strlen ( player_start ) + 1 ) ) {
+				audacious_manage_start ( );
 				break;
 			}
 		}
@@ -747,7 +763,6 @@ static void button_connect_clicked_cb ( GtkButton *button, gpointer data ) {
 		set_signal_subscribe_to_net_status ( );
 	}
 
-	//init_for_irc_net ( );
 
 	if ( strlen ( new_message ) ) { init_sounds ( ); volume = 1; }
 
@@ -793,6 +808,11 @@ static void check_net_device_toggled_cb ( GtkToggleButton *button, gpointer data
 	config_write ( );
 }
 
+static void check_check_audacious_toggled_cb ( GtkToggleButton *button, gpointer data ) {
+	cfg.check_audacious = gtk_toggle_button_get_active ( button ) == TRUE ? 1 : 0;
+	config_write ( );
+}
+
 static void item_show_window_activate_cb ( GtkMenuItem *item, gpointer data ) {
 	gtk_widget_show_all ( w.window_main );
 }
@@ -807,6 +827,8 @@ static gboolean window_main_delete_event_cb ( GtkWidget *widget, GdkEvent *event
 }
 
 static void g_startup ( GtkApplication *app, gpointer data ) {
+	init_for_irc_net ( );
+
 	w.window_main = gtk_application_window_new ( app );
 	gtk_window_set_default_size ( ( GtkWindow * ) w.window_main, 500, 600 );
 	w.box_window_main = gtk_box_new ( GTK_ORIENTATION_VERTICAL, 0 );
@@ -997,6 +1019,27 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 	gtk_widget_set_margin_end ( w.frame_volume, 32 );
 	gtk_container_add ( ( GtkContainer * ) w.frame_volume, w.box_volume );
 
+	/* создать блок - подписка на сетевое устройство */
+	w.frame_check_audacious = g_object_new ( GTK_TYPE_FRAME, "shadow-type", GTK_SHADOW_NONE, NULL );
+	gtk_frame_set_shadow_type ( ( GtkFrame * ) w.frame_check_audacious, GTK_SHADOW_OUT );
+	w.box_check_audacious = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	w.label_check_audacious = gtk_label_new ( "control player audacious" );
+	w.check_check_audacious = gtk_check_button_new ( );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_check_audacious, w.label_check_audacious, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_check_audacious, w.check_check_audacious, FALSE, FALSE, 0 );
+	gtk_widget_set_margin_top ( w.label_check_audacious, 10 );
+	gtk_widget_set_margin_bottom ( w.label_check_audacious, 10 );
+	gtk_widget_set_margin_start ( w.label_check_audacious, 10 );
+	gtk_widget_set_margin_end ( w.label_check_audacious, 10 );
+	gtk_widget_set_margin_top ( w.check_check_audacious, 10 );
+	gtk_widget_set_margin_bottom ( w.check_check_audacious, 10 );
+	gtk_widget_set_margin_start ( w.check_check_audacious, 10 );
+	gtk_widget_set_margin_end ( w.check_check_audacious, 10 );
+	gtk_widget_set_margin_top ( w.frame_check_audacious, 10 );
+	gtk_widget_set_margin_start ( w.frame_check_audacious, 32 );
+	gtk_widget_set_margin_end ( w.frame_check_audacious, 32 );
+	gtk_container_add ( ( GtkContainer * ) w.frame_check_audacious, w.box_check_audacious );
+
 	/* создать блок кнопок */
 	w.box_control = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
 	w.button_connect = gtk_button_new_with_label ( "ПОДКЛЮЧИТЬСЯ" );
@@ -1012,6 +1055,7 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_current_new_message, FALSE, FALSE, 0 );
 	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_sub_net_device, FALSE, FALSE, 0 );
 	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_volume, FALSE, FALSE, 0 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_check_audacious, FALSE, FALSE, 0 );
 	gtk_box_pack_end ( ( GtkBox * ) w.box_window_main, w.box_control, FALSE, FALSE, 0 );
 
 	w.header_bar = gtk_header_bar_new ( );
@@ -1033,12 +1077,16 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 	if ( cfg.check_net_device ) {
 		gtk_toggle_button_set_active ( ( GtkToggleButton * ) w.check_sub_net_device, TRUE );
 	}
+	if ( cfg.check_audacious ) {
+		gtk_toggle_button_set_active ( ( GtkToggleButton * ) w.check_check_audacious, TRUE );
+	}
 
 	gtk_widget_show_all ( w.window_main );
 
 	g_signal_connect ( w.button_connect, "clicked", G_CALLBACK ( button_connect_clicked_cb ), NULL );
 	g_signal_connect ( w.scale_volume, "value-changed", G_CALLBACK ( scale_volume_value_changed_cb ), NULL );
 	g_signal_connect ( w.check_sub_net_device, "toggled", G_CALLBACK ( check_net_device_toggled_cb ), NULL );
+	g_signal_connect ( w.check_check_audacious, "toggled", G_CALLBACK ( check_check_audacious_toggled_cb ), NULL );
 	g_signal_connect ( w.button_current_new_message, "clicked", G_CALLBACK ( button_current_new_message_clicked_cb ), NULL );
 	g_signal_connect ( w.window_main, "delete-event", G_CALLBACK ( window_main_delete_event_cb ), NULL );
 

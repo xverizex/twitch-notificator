@@ -29,6 +29,7 @@ struct conf {
 	unsigned int audacious;
 	unsigned int notify_frozen;
 	unsigned int check_net_device;
+	unsigned int check_audacious;
 };
 void parser_config_init ( );
 void config_write ( );
