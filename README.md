@@ -21,3 +21,4 @@ Control music player 'audacious.
 
 ![](http://s1.uploadpics.ru/images/bJg51xc7BL.png)
 ![](http://s1.uploadpics.ru/images/WJGoJlcXrI.png)
+![](http://s1.uploadpics.ru/images/bJNMi1DNrI.png)
