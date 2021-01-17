@@ -101,6 +101,11 @@ struct widgets {
 	GtkWidget *box_control;
 	GtkWidget *button_connect;
 	GtkWidget *header_bar;
+	GtkWidget *frame_gift;
+	GtkWidget *box_gift;
+	GtkWidget *label_gift;
+	GtkWidget *entry_gift;
+	GtkWidget *button_gift;
 
 
 	GtkWidget *STUBS;
@@ -743,6 +748,16 @@ static void button_current_new_message_clicked_cb ( GtkButton *button, gpointer 
 	gtk_widget_destroy ( dialog );
 }
 
+static void button_gift_clicked_cb ( GtkButton *button, gpointer data ) {
+	const char *nick = gtk_entry_get_text ( ( GtkEntry * ) w.entry_gift );
+	if ( strlen ( nick ) > 0 ) {
+		char *gift = g_strdup_printf ( "%s/ban %s\n", line_for_message, nick );
+		if ( gift == NULL ) return;
+		write ( sockfd, gift, strlen ( gift ) );
+		g_free ( gift );
+	}
+}
+
 static void button_connect_clicked_cb ( GtkButton *button, gpointer data ) {
 	const char *oauth_token = gtk_entry_get_text ( ( GtkEntry * ) w.entry_current_token );
 	const char *login = gtk_entry_get_text ( ( GtkEntry * ) w.entry_current_login );
@@ -1041,6 +1056,34 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 	gtk_widget_set_margin_end ( w.frame_check_audacious, 32 );
 	gtk_container_add ( ( GtkContainer * ) w.frame_check_audacious, w.box_check_audacious );
 
+	/* создать блок - передачи подарка */
+	w.frame_gift = g_object_new ( GTK_TYPE_FRAME, "shadow-type", GTK_SHADOW_NONE, NULL );
+	gtk_frame_set_shadow_type ( ( GtkFrame * ) w.frame_gift, GTK_SHADOW_OUT );
+	w.label_gift = gtk_label_new ( "подарок" );
+	w.entry_gift = gtk_entry_new ( );
+	gtk_entry_set_alignment ( ( GtkEntry * ) w.entry_gift, 1 );
+	gtk_entry_set_width_chars ( ( GtkEntry * ) w.entry_gift, 20 );
+	w.button_gift = gtk_button_new_with_label ( "ОТПРАВИТЬ" );
+	w.box_gift = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_gift, w.label_gift, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_gift, w.button_gift, FALSE, FALSE, 0 );
+	gtk_box_pack_end ( ( GtkBox * ) w.box_gift, w.entry_gift, FALSE, FALSE, 0 );
+	gtk_container_add ( ( GtkContainer * ) w.frame_gift, w.box_gift );
+	gtk_widget_set_margin_top ( w.label_gift, 10 );
+	gtk_widget_set_margin_bottom ( w.label_gift, 10 );
+	gtk_widget_set_margin_start ( w.label_gift, 10 );
+	gtk_widget_set_margin_end ( w.label_gift, 10 );
+	gtk_widget_set_margin_top ( w.entry_gift, 10 );
+	gtk_widget_set_margin_bottom ( w.entry_gift, 10 );
+	gtk_widget_set_margin_start ( w.entry_gift, 10 );
+	gtk_widget_set_margin_top ( w.button_gift, 10 );
+	gtk_widget_set_margin_bottom ( w.button_gift, 10 );
+	gtk_widget_set_margin_start ( w.button_gift, 10 );
+	gtk_widget_set_margin_end ( w.button_gift, 10 );
+	gtk_widget_set_margin_top ( w.frame_gift, 10 );
+	gtk_widget_set_margin_start ( w.frame_gift, 32 );
+	gtk_widget_set_margin_end ( w.frame_gift, 32 );
+
 	/* создать блок кнопок */
 	w.box_control = gtk_box_new ( GTK_ORIENTATION_HORIZONTAL, 0 );
 	w.button_connect = gtk_button_new_with_label ( "ПОДКЛЮЧИТЬСЯ" );
@@ -1057,6 +1100,7 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_sub_net_device, FALSE, FALSE, 0 );
 	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_volume, FALSE, FALSE, 0 );
 	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_check_audacious, FALSE, FALSE, 0 );
+	gtk_box_pack_start ( ( GtkBox * ) w.box_window_main, w.frame_gift, FALSE, FALSE, 0 );
 	gtk_box_pack_end ( ( GtkBox * ) w.box_window_main, w.box_control, FALSE, FALSE, 0 );
 
 	w.header_bar = gtk_header_bar_new ( );
@@ -1090,6 +1134,7 @@ static void g_startup ( GtkApplication *app, gpointer data ) {
 	g_signal_connect ( w.check_check_audacious, "toggled", G_CALLBACK ( check_check_audacious_toggled_cb ), NULL );
 	g_signal_connect ( w.button_current_new_message, "clicked", G_CALLBACK ( button_current_new_message_clicked_cb ), NULL );
 	g_signal_connect ( w.window_main, "delete-event", G_CALLBACK ( window_main_delete_event_cb ), NULL );
+	g_signal_connect ( w.button_gift, "clicked", G_CALLBACK ( button_gift_clicked_cb ), NULL );
 
 	notify = g_notification_new ( "twitch_bot" );
 	g_notification_set_priority ( notify, G_NOTIFICATION_PRIORITY_HIGH );
